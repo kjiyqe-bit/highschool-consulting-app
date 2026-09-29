@@ -675,13 +675,24 @@ async function handleSushiSubmit(event) {
   const btn = document.getElementById('sushi-submit-btn');
 
   const year = document.getElementById('sushi-year').value;
-  const school = document.getElementById('sushi-school').value.trim();
-  const rank = document.getElementById('sushi-rank').value.trim();
-  const grade = document.getElementById('sushi-grade').value.trim();
+  const schoolInput = document.getElementById('sushi-school');
+  const rankInput = document.getElementById('sushi-rank');
+  const gradeInput = document.getElementById('sushi-grade');
+
+  const school = schoolInput ? schoolInput.value.trim() : '';
+  const rank = rankInput ? rankInput.value.trim() : '';
+  const grade = gradeInput ? gradeInput.value.trim() : '';
   const author = state.user ? state.user.name : '상담진';
 
   if (!school) {
-    alert('학교명을 입력해 주세요.');
+    showErrorModal('입력 항목 누락', '학교명을 입력해 주세요.');
+    if (schoolInput) schoolInput.focus();
+    return;
+  }
+
+  if (!rank) {
+    showErrorModal('입력 항목 누락', '전교 등수를 입력해 주세요. (예: 1등, 전교3등)');
+    if (rankInput) rankInput.focus();
     return;
   }
 
@@ -690,9 +701,9 @@ async function handleSushiSubmit(event) {
   const items = [];
 
   subRows.forEach(row => {
-    const univ = row.querySelector('.sub-univ').value.trim();
-    const dept = row.querySelector('.sub-dept').value.trim();
-    const typeName = row.querySelector('.sub-type').value.trim();
+    const univ = row.querySelector('.sub-univ') ? row.querySelector('.sub-univ').value.trim() : '';
+    const dept = row.querySelector('.sub-dept') ? row.querySelector('.sub-dept').value.trim() : '';
+    const typeName = row.querySelector('.sub-type') ? row.querySelector('.sub-type').value.trim() : '';
 
     if (univ) {
       items.push({
@@ -709,7 +720,9 @@ async function handleSushiSubmit(event) {
   });
 
   if (items.length === 0) {
-    alert('합격 대학을 1개 이상 입력해 주세요.');
+    showErrorModal('입력 항목 누락', '합격 대학 및 학과 정보를 최소 1개 이상 입력해 주세요.');
+    const firstUnivInput = document.querySelector('#sushi-sub-rows .sub-univ');
+    if (firstUnivInput) firstUnivInput.focus();
     return;
   }
 
@@ -725,11 +738,11 @@ async function handleSushiSubmit(event) {
 
     const result = await res.json();
     if (result.success) {
-      showToast(`${school}의 수시 합격 데이터 ${items.length}건이 성공적으로 등록되었습니다!`, 'success');
+      showToast(`'${school}' 수시 합격 데이터 ${items.length}건이 성공적으로 누적 저장되었습니다!`, 'success');
       
       // 폼 초기화 (학교명은 재입력 편의를 위해 유지)
-      document.getElementById('sushi-rank').value = '';
-      document.getElementById('sushi-grade').value = '';
+      if (rankInput) rankInput.value = '';
+      if (gradeInput) gradeInput.value = '';
       const subRowsCont = document.getElementById('sushi-sub-rows');
       if (subRowsCont) subRowsCont.innerHTML = '';
       addSushiSubRow();
@@ -737,10 +750,10 @@ async function handleSushiSubmit(event) {
       // 최신 데이터 갱신
       await loadData();
     } else {
-      alert(`저장 실패: ${result.error || '알 수 없는 오류'}`);
+      showErrorModal('구글 시트 저장 실패', result.error || '알 수 없는 오류가 발생했습니다.');
     }
   } catch (err) {
-    alert('서버 통신 오류가 발생했습니다.');
+    showErrorModal('통신 오류', '서버 통신 중 오류가 발생했습니다. 구글 시트 연동 상태를 확인해 주세요.');
   } finally {
     btn.disabled = false;
     btn.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i><span>수시 합격 데이터 구글 시트에 누적 저장</span>`;
@@ -757,13 +770,24 @@ async function handleProgramSubmit(event) {
 
   const category = document.getElementById('prog-category').value;
   const year = document.getElementById('prog-year').value;
-  const school = document.getElementById('prog-school').value.trim();
-  const rawName = document.getElementById('prog-name').value.trim();
-  const content = document.getElementById('prog-content').value.trim();
+  const schoolInput = document.getElementById('prog-school');
+  const nameInput = document.getElementById('prog-name');
+  const contentInput = document.getElementById('prog-content');
+
+  const school = schoolInput ? schoolInput.value.trim() : '';
+  const rawName = nameInput ? nameInput.value.trim() : '';
+  const content = contentInput ? contentInput.value.trim() : '';
   const author = state.user ? state.user.name : '상담진';
 
-  if (!school || !rawName) {
-    alert('학교명과 프로그램/동아리 명칭을 입력해 주세요.');
+  if (!school) {
+    showErrorModal('입력 항목 누락', '학교명을 입력해 주세요.');
+    if (schoolInput) schoolInput.focus();
+    return;
+  }
+
+  if (!rawName) {
+    showErrorModal('입력 항목 누락', '프로그램 또는 동아리 명칭을 입력해 주세요.');
+    if (nameInput) nameInput.focus();
     return;
   }
 
@@ -790,14 +814,14 @@ async function handleProgramSubmit(event) {
     const result = await res.json();
     if (result.success) {
       showToast(`'${name}' 정보가 구글 시트에 성공적으로 저장되었습니다!`, 'success');
-      document.getElementById('prog-name').value = '';
-      document.getElementById('prog-content').value = '';
+      if (nameInput) nameInput.value = '';
+      if (contentInput) contentInput.value = '';
       await loadData();
     } else {
-      alert(`저장 실패: ${result.error || '알 수 없는 오류'}`);
+      showErrorModal('구글 시트 저장 실패', result.error || '알 수 없는 오류가 발생했습니다.');
     }
   } catch (e) {
-    alert('서버 통신 오류가 발생했습니다.');
+    showErrorModal('통신 오류', '서버 통신 중 오류가 발생했습니다. 구글 시트 연동 상태를 확인해 주세요.');
   } finally {
     btn.disabled = false;
     btn.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i><span>프로그램/동아리 정보 구글 시트에 누적 저장</span>`;
@@ -813,17 +837,22 @@ async function handleSchoolSubmit(event) {
   const btn = document.getElementById('school-submit-btn');
 
   const year = document.getElementById('school-year').value;
-  const name = document.getElementById('school-name').value.trim();
-  const students = document.getElementById('school-students').value.trim();
-  const link = document.getElementById('school-link').value.trim();
+  const nameInput = document.getElementById('school-name');
+  const studentsInput = document.getElementById('school-students');
+  const linkInput = document.getElementById('school-link');
+
+  const name = nameInput ? nameInput.value.trim() : '';
+  const students = studentsInput ? studentsInput.value.trim() : '';
+  const link = linkInput ? linkInput.value.trim() : '';
 
   if (!name) {
-    alert('학교명을 입력해 주세요.');
+    showErrorModal('입력 항목 누락', '학교명을 입력해 주세요.');
+    if (nameInput) nameInput.focus();
     return;
   }
 
   btn.disabled = true;
-  btn.innerHTML = `<span class="animate-pulse">저장 중...</span>`;
+  btn.innerHTML = `<span class="animate-pulse">구글 시트에 저장 중...</span>`;
 
   try {
     const res = await fetch('/api/schools', {
@@ -842,10 +871,10 @@ async function handleSchoolSubmit(event) {
       showToast(`'${name}' 학교 기본 정보가 저장되었습니다!`, 'success');
       await loadData();
     } else {
-      alert(`저장 실패: ${result.error}`);
+      showErrorModal('구글 시트 저장 실패', result.error || '알 수 없는 오류가 발생했습니다.');
     }
   } catch (e) {
-    alert('서버 통신 오류');
+    showErrorModal('통신 오류', '서버 통신 중 오류가 발생했습니다.');
   } finally {
     btn.disabled = false;
     btn.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i><span>학교 기본 정보 구글 시트에 저장</span>`;

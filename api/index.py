@@ -27,7 +27,8 @@ import datetime
 # 1. 구글 스프레드시트 및 Apps Script 기본 정보
 # ===========================================================================
 SPREADSHEET_ID = "1bCdrA4uBZ2wdiwzj5HU8UIHDaGcKeagZGivASk8qcaY"
-DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbDhQp3TlveBmg2EN9wmekYGqGjmvLPLgkLg1NgfXxoqUmH0J36xFAH3rhJlifYYv0b/exec"
+DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbx5l_GTVJEv0GvneFJBMLyVb1IHwwOvFq3RqJXZqyks3q9L-bpS534s03BJTPwhm8NR/exec"
+FALLBACK_GAS_URL = "https://script.google.com/macros/s/AKfycbx5l_GTVJEv0GvneFJBMLyVb1IHwwOvFq3RqJXZqyks3q9L-bpS534s03BJTPwhm8NR/exec"
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(CURRENT_DIR)
@@ -138,12 +139,8 @@ def fetch_all_sheets():
 # ===========================================================================
 # 4. Google Apps Script 실시간 쓰기 연동 (WebHook POST)
 # ===========================================================================
-def sync_to_apps_script(action, table, row_data):
-    """Google Apps Script로 데이터 등록 요청 전송"""
-    gas_url = load_gas_url()
-    if not gas_url:
-        return {"success": False, "error": "GAS URL이 설정되지 않았습니다."}
-
+def send_post_to_gas(target_url, action, table, row_data):
+    """지정된 GAS URL로 POST 요청 전송 유틸리티"""
     payload = json.dumps({
         "action": action,
         "table": table,
@@ -151,17 +148,32 @@ def sync_to_apps_script(action, table, row_data):
     }, ensure_ascii=False).encode("utf-8")
 
     req = urllib.request.Request(
-        gas_url,
+        target_url,
         data=payload,
         headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"}
     )
 
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        raw = resp.read().decode("utf-8")
+        return json.loads(raw)
+
+def sync_to_apps_script(action, table, row_data):
+    """Google Apps Script로 데이터 등록 요청 전송 (오류 발생 시 백업 URL로 자동 핫스왑)"""
+    primary_url = load_gas_url() or DEFAULT_GAS_URL
+
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            raw = resp.read().decode("utf-8")
-            return json.loads(raw)
-    except Exception as e:
-        return {"success": False, "error": f"구글 시트 연동 실패: {str(e)}"}
+        return send_post_to_gas(primary_url, action, table, row_data)
+    except Exception as primary_err:
+        # primary_url 실패 시 (404 등), 동작하는 백업 주소로 즉시 자동 핫스왑 전환!
+        if primary_url != FALLBACK_GAS_URL:
+            try:
+                res = send_post_to_gas(FALLBACK_GAS_URL, action, table, row_data)
+                # 성공 시 복구된 정상 주소를 설정 파일로 저장
+                save_gas_url(FALLBACK_GAS_URL)
+                return res
+            except Exception:
+                pass
+        return {"success": False, "error": f"구글 시트 연동 실패: {str(primary_err)}"}
 
 # ===========================================================================
 # 5. Vercel Serverless 요청 핸들러
