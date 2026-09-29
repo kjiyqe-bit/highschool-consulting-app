@@ -504,43 +504,79 @@ class handler(http.server.BaseHTTPRequestHandler):
             return
 
         # ===================================================================
-        # 1. 로그인 인증 API (/api/login)
+        # 1. 로그인 인증 API (/api/login) - 스마트 다중 매칭 엔진
         # ===================================================================
         if route == "login":
             name = str(payload.get("name", "")).strip()
-            phone = clean_phone(str(payload.get("phone", "")))
-            emp_no = str(payload.get("emp_no", "")).strip()
+            raw_phone = str(payload.get("phone", "")).strip()
+            phone = clean_phone(raw_phone)
+            raw_emp = str(payload.get("emp_no", "")).strip()
+            emp_no = clean_phone(raw_emp) if clean_phone(raw_emp) else raw_emp.replace(" ", "")
 
-            if not name or not phone or not emp_no:
+            # 이름과 사번(또는 휴대폰 번호) 중 최소한의 식별 정보 검증
+            if not name:
                 self.send_json_response(400, {
                     "success": False,
-                    "error": "성명, 휴대폰 번호, 사번을 모두 입력해 주세요."
+                    "error": "성명(이름)을 입력해 주세요."
                 })
                 return
 
-            # 구글 시트에서 최신 접근 권한 데이터 확인
+            if not emp_no and not phone:
+                self.send_json_response(400, {
+                    "success": False,
+                    "error": "사번(8자리)을 입력해 주세요."
+                })
+                return
+
+            # 구글 시트에서 최신 접근 권한 데이터 확인 (캐시가 비어있으면 원본 재조회)
             data = init_local_data()
             access_list = data.get("access", [])
+            if not access_list:
+                refreshed = fetch_from_google_sheets()
+                access_list = refreshed.get("access", [])
+                data["access"] = access_list
 
-            # 매칭 비교 (공백 제거 등 유연한 비교 적용)
             clean_input_name = name.replace(" ", "")
-            clean_input_emp = emp_no.replace(" ", "")
 
             matched_user = None
             for row in access_list:
                 row_name = str(row.get("이름", "")).strip()
                 row_phone = clean_phone(str(row.get("휴대폰 번호", "")))
-                row_emp_no = str(row.get("사번", "")).strip()
+                row_emp_raw = str(row.get("사번", "")).strip()
+                row_emp_clean = clean_phone(row_emp_raw) if clean_phone(row_emp_raw) else row_emp_raw.replace(" ", "")
 
+                # 이름 일치 여부 (공백 제거 유연 비교)
                 name_match = (row_name == name) or (row_name.replace(" ", "") == clean_input_name)
-                phone_match = (row_phone == phone)
-                emp_match = (row_emp_no == emp_no) or (row_emp_no.replace(" ", "") == clean_input_emp)
+                if not name_match:
+                    continue
 
-                if name_match and phone_match and emp_match:
+                # 사번 일치 여부
+                emp_match = False
+                if emp_no and (row_emp_raw == raw_emp or row_emp_clean == emp_no or row_emp_raw.replace(" ", "") == raw_emp.replace(" ", "")):
+                    emp_match = True
+
+                # 휴대폰 번호 일치 여부
+                phone_match = False
+                if phone and row_phone and (row_phone == phone):
+                    phone_match = True
+
+                # [인증 성공 판정 조건]
+                # 1) 이름과 사번이 일치하는 경우 (가장 확실한 식별: 14명 전원 고유 8자리 사번 보유)
+                #    시트에 휴대폰 번호가 누락된 10명의 선생님도 완벽하게 로그인 보장
+                # 2) 또는 사번을 잊어버렸더라도 시트에 등록된 휴대폰 번호와 일치하는 경우
+                is_authenticated = False
+                if emp_match:
+                    # 사번이 맞으면, 시트에 휴대폰 번호가 없어도 통과! 
+                    # 만약 시트에 휴대폰 번호가 있고 사용자가 입력했다면 번호도 검사하되, 사용자가 휴대폰 입력을 건너뛰었어도 통과
+                    if not row_phone or not phone or (row_phone == phone):
+                        is_authenticated = True
+                elif phone_match:
+                    is_authenticated = True
+
+                if is_authenticated:
                     # 구글 시트 '접근 권한' 시트 D열 헤더("관리자" 또는 "권한") 및 셀 값 검사
                     raw_auth = str(row.get("관리자") or row.get("권한") or "").strip()
                     if not raw_auth:
-                        # 컬럼명이 다른 경우를 대비해 행의 모든 값 중 "관리자" 문자열 검색
                         for k, v in row.items():
                             if k != "_id" and "관리자" in str(v):
                                 raw_auth = "관리자"
@@ -549,8 +585,8 @@ class handler(http.server.BaseHTTPRequestHandler):
                     role = "admin" if ("관리자" in raw_auth or "admin" in raw_auth.lower()) else "user"
                     matched_user = {
                         "name": row_name,
-                        "phone": row_phone,
-                        "emp_no": row_emp_no,
+                        "phone": raw_phone if raw_phone else (row_phone if row_phone else "미등록"),
+                        "emp_no": row_emp_raw,
                         "role": role,
                         "role_label": "관리자" if role == "admin" else "일반 사용자"
                     }
@@ -565,7 +601,7 @@ class handler(http.server.BaseHTTPRequestHandler):
             else:
                 self.send_json_response(401, {
                     "success": False,
-                    "error": "입력하신 정보와 일치하는 계정을 찾을 수 없습니다. (이름, 휴대폰번호, 사번을 확인하세요)"
+                    "error": "입력하신 정보와 일치하는 계정을 찾을 수 없습니다. 성명과 사번(8자리)을 확인해 주세요."
                 })
             return
 

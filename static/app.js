@@ -39,8 +39,8 @@ const state = {
 document.addEventListener('DOMContentLoaded', () => {
   lucide.createIcons();
 
-  // 1. 사번 입력 칸 placeholder에 '오늘 날짜' 동적 주입 (요구사항 반영)
-  setTodayPlaceholderForEmpNo();
+  // 1. 사번 입력 안내 설정
+  setupEmpNoPlaceholder();
 
   // 2. 세션 복원
   const savedUser = sessionStorage.getItem('consulting_user');
@@ -64,16 +64,12 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /**
- * 사번 칸의 placeholder에 오늘 날짜(YYYY-MM-DD)를 자동 표시
+ * 사번 입력 칸의 안내 문구 설정 (8자리 사번 예시)
  */
-function setTodayPlaceholderForEmpNo() {
+function setupEmpNoPlaceholder() {
   const empInput = document.getElementById('login-emp-no');
   if (empInput) {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    empInput.placeholder = `${yyyy}-${mm}-${dd}`;
+    empInput.placeholder = "사번 8자리 (예: 20160148)";
   }
 }
 
@@ -129,14 +125,30 @@ async function handleLoginSubmit(event) {
   const errorBox = document.getElementById('login-error-msg');
   const errorText = document.getElementById('login-error-text');
 
+  const nameVal = document.getElementById('login-name').value.trim();
+  const empVal = document.getElementById('login-emp-no').value.trim();
+  const phoneVal = document.getElementById('login-phone') ? document.getElementById('login-phone').value.trim() : '';
+
+  if (!nameVal) {
+    errorText.textContent = '성명(이름)을 입력해 주세요.';
+    errorBox.classList.remove('hidden');
+    return;
+  }
+
+  if (!empVal) {
+    errorText.textContent = '사번 8자리를 입력해 주세요.';
+    errorBox.classList.remove('hidden');
+    return;
+  }
+
   btn.disabled = true;
   btn.innerHTML = `<span class="animate-pulse">인증 확인 중...</span>`;
   errorBox.classList.add('hidden');
 
   const payload = {
-    name: document.getElementById('login-name').value.trim(),
-    phone: document.getElementById('login-phone').value.trim(),
-    emp_no: document.getElementById('login-emp-no').value.trim()
+    name: nameVal,
+    emp_no: empVal,
+    phone: phoneVal
   };
 
   try {
@@ -154,11 +166,11 @@ async function handleLoginSubmit(event) {
       showToast(`${state.user.name}님 환영합니다! (${state.user.role_label})`, 'success');
       await loadData();
     } else {
-      errorText.textContent = result.error || '접근 권한이 없습니다. 정보를 다시 확인해 주세요.';
+      errorText.textContent = result.error || '접근 권한이 없습니다. 성명과 사번(8자리)을 확인해 주세요.';
       errorBox.classList.remove('hidden');
     }
   } catch (err) {
-    errorText.textContent = '서버 통신 중 오류가 발생했습니다.';
+    errorText.textContent = '서버 통신 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';
     errorBox.classList.remove('hidden');
   } finally {
     btn.disabled = false;
