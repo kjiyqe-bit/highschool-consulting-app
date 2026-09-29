@@ -36,7 +36,7 @@ CONFIG_FILE = os.path.join("/tmp" if os.path.exists("/tmp") else CURRENT_DIR, "c
 
 SHEET_MAPPING = {
     "access": ["접근 권한", "접근권한", "사용자", "권한"],
-    "schools": ["학교_기본정보", "학교기본정보", "학교"],
+    "schools": ["학교_기본 정보", "학교_기본정보", "학교기본정보", "학교"],
     "sushi": ["수시합격_입력", "수시합격", "수시"],
     "programs": ["특별프로그램_입력", "특별프로그램", "프로그램", "동아리"],
     "dashboard": ["대시보드_집계용", "학교별_대시보드", "대시보드"]
@@ -453,32 +453,37 @@ class handler(http.server.BaseHTTPRequestHandler):
         # 2. [학교 기본 정보 등록] (/api/schools)
         # -------------------------------------------------------------------
         if route == "schools":
-            year = str(body.get("연도", "2026")).strip()
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            year = str(body.get("학년도", body.get("연도", "2026학년도"))).strip()
             name = str(body.get("학교명", "")).strip()
-            students = str(body.get("전교 학생수", body.get("전교학생수", ""))).strip()
-            link = str(body.get("교과 편성표(링크)", body.get("링크", ""))).strip() or "링크입력예정"
+            students = str(body.get("학생 수", body.get("학생수", body.get("전교 학생수", body.get("전교학생수", ""))))).strip()
+            school_type = str(body.get("학교 유형", body.get("학교유형", "일반고"))).strip()
+            link = str(body.get("교과 편성표(링크)", body.get("교과편성표(링크)", body.get("링크", "")))).strip() or "링크입력예정"
 
             if not name:
                 self.send_json(400, {"success": False, "error": "학교명을 입력해 주세요."})
                 return
 
             prefix = name[:4] if len(name) >= 4 else name
-            school_code = f"{year}{prefix}"
+            clean_year_num = re.sub(r"[^0-9]", "", year)
+            school_code = f"{clean_year_num}{prefix}"
 
             new_record = {
-                "학교코드(고유값)": school_code,
-                "연도": year,
+                "입력 시간": timestamp,
+                "학교 코드(고유값)": school_code,
+                "학년도": year,
                 "학교명": name,
-                "전교 학생수": students,
+                "학생 수": students,
+                "학교 유형": school_type,
                 "교과 편성표(링크)": link,
                 "링크": link,
-                "데이터 수집 현황": "0 / 10"
+                "전교 학생수": students
             }
 
             gas_res = sync_to_apps_script("add", "schools", new_record)
             self.send_json(200, {
                 "success": True,
-                "message": f"'{name}' 학교 정보가 성공적으로 등록되었습니다.",
+                "message": f"'{name}' ({year}) 학교 정보가 성공적으로 등록되었습니다.",
                 "item": new_record,
                 "gas_res": gas_res
             })
