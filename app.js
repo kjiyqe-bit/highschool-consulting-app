@@ -92,7 +92,15 @@ async function handleLoginSubmit(event) {
     showLoginError('성명(이름)을 입력해 주세요.');
     return;
   }
-  if (!empVal && !phoneVal) {
+  if (!phoneVal) {
+    showLoginError('휴대폰 뒷자리 4개를 입력해 주세요.');
+    return;
+  }
+  if (!/^\d{4}$/.test(phoneVal)) {
+    showLoginError('휴대폰 뒷자리는 숫자 4자리로 입력해 주세요. (예: 1234)');
+    return;
+  }
+  if (!empVal) {
     showLoginError('사번을 입력해 주세요.');
     return;
   }

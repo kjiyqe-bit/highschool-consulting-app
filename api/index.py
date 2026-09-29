@@ -341,8 +341,13 @@ class handler(http.server.BaseHTTPRequestHandler):
                 self.send_json(400, {"success": False, "error": "성명(이름)을 입력해 주세요."})
                 return
 
-            if not emp_input and not phone_input:
-                self.send_json(400, {"success": False, "error": "사번(또는 휴대폰 번호)을 입력해 주세요."})
+            clean_input_phone = clean_digits(phone_input)
+            if not clean_input_phone or len(clean_input_phone) < 4:
+                self.send_json(400, {"success": False, "error": "휴대폰 뒷자리 4개를 입력해 주세요. (예: 1234)"})
+                return
+
+            if not emp_input:
+                self.send_json(400, {"success": False, "error": "사번을 입력해 주세요."})
                 return
 
             # '접근 권한' 시트 실시간 조회
@@ -355,11 +360,13 @@ class handler(http.server.BaseHTTPRequestHandler):
                 return
 
             clean_input_name = name_input.replace(" ", "")
-            clean_input_phone = clean_digits(phone_input)
             clean_input_emp = clean_digits(emp_input)
             today_digits = datetime.datetime.now().strftime("%Y%m%d")
+            input_phone_tail = clean_input_phone[-4:]
 
             name_found = False
+            phone_mismatch = False
+            emp_mismatch = False
             matched = None
 
             for row in access_rows:
@@ -375,27 +382,33 @@ class handler(http.server.BaseHTTPRequestHandler):
 
                 name_found = True
 
+                # 휴대폰 뒷자리 4개 검증
+                # 시트에 전화번호가 기재되어 있는 경우: 뒷 4자리 일치 여부 검증
+                # 시트에 전화번호가 비어 있는 경우: 4자리 입력이면 허용
+                if row_phone:
+                    row_phone_tail = row_phone[-4:]
+                    is_phone_match = (input_phone_tail == row_phone_tail)
+                else:
+                    is_phone_match = (len(input_phone_tail) == 4)
+
+                if not is_phone_match:
+                    phone_mismatch = True
+
                 # C열 사번 비교:
                 # 1) 입력한 사번 번호가 시트의 사번 번호와 일치하거나
-                # 2) 사용자가 placeholder의 오늘 날짜(YYYYMMDD)를 입력하고, 이름이 일치하는 교직원인 경우 인증 통과
-                emp_match = False
+                # 2) 사용자가 placeholder의 오늘 날짜(YYYYMMDD)를 입력하고, 이름이 일치하는 교직원인 경우 인정
+                is_emp_match = False
                 if emp_input:
                     if row_emp == emp_input or (clean_input_emp and row_emp_digits == clean_input_emp):
-                        emp_match = True
+                        is_emp_match = True
                     elif clean_input_emp == today_digits:
-                        # 오늘 날짜를 사번 칸에 입력한 경우 본인 확인 인정
-                        emp_match = True
+                        is_emp_match = True
 
-                # B열 휴대폰 번호 비교:
-                phone_match = False
-                if clean_input_phone and row_phone and (clean_input_phone == row_phone):
-                    phone_match = True
+                if not is_emp_match:
+                    emp_mismatch = True
 
-                # [인증 성공 판정]
-                # - 사번이 일치하면 휴대폰 번호가 시트에 누락되어 있어도 100% 통과!
-                # - 또는 휴대폰 번호가 일치해도 통과!
-                # - 만약 시트에 휴대폰 번호가 없고, 이름이 정확히 일치하는 경우도 사번/날짜 매칭으로 통과
-                if emp_match or phone_match:
+                # 성명, 휴대폰 뒷자리 4개, 사번 모두 일치 시 인증 성공
+                if is_phone_match and is_emp_match:
                     raw_auth = str(row.get("관리자") or row.get("권한") or "").strip()
                     if not raw_auth:
                         for k, v in row.items():
@@ -406,7 +419,7 @@ class handler(http.server.BaseHTTPRequestHandler):
                     is_admin = ("관리자" in raw_auth or "admin" in raw_auth.lower())
                     matched = {
                         "name": row_name,
-                        "phone": phone_input if phone_input else (row_phone if row_phone else "미등록"),
+                        "phone": input_phone_tail,
                         "emp_no": row_emp,
                         "role": "admin" if is_admin else "user",
                         "role_label": "관리자" if is_admin else "일반 사용자"
@@ -420,12 +433,16 @@ class handler(http.server.BaseHTTPRequestHandler):
                     "user": matched
                 })
             else:
-                # 실패 사유 상세 진단
+                # 상세 에러 메시지 제공
                 if not name_found:
                     err_msg = f"입력하신 성명 '{name_input}'이(가) 구글 시트 '접근 권한' 시트에 등록되어 있지 않습니다. 이름을 확인해 주세요."
+                elif phone_mismatch and not emp_mismatch:
+                    err_msg = f"'{name_input}' 선생님의 성명과 사번은 확인되었으나, 휴대폰 뒷자리 4개가 일치하지 않습니다."
+                elif emp_mismatch and not phone_mismatch:
+                    err_msg = f"'{name_input}' 선생님의 성명과 휴대폰 뒷자리는 확인되었으나, 사번이 일치하지 않습니다. 사번(또는 오늘 날짜 {today_digits})을 확인해 주세요."
                 else:
-                    err_msg = f"'{name_input}' 선생님의 계정이 확인되었으나 사번 또는 휴대폰 번호가 일치하지 않습니다. 등록된 8자리 사번(또는 오늘 날짜 {today_digits})을 확인해 주세요."
-                
+                    err_msg = f"'{name_input}' 선생님의 정보가 확인되었으나 휴대폰 뒷자리 또는 사번이 일치하지 않습니다."
+
                 self.send_json(401, {
                     "success": False,
                     "error": err_msg

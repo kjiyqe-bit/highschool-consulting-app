@@ -30,7 +30,7 @@
         <h2 class="text-xl sm:text-2xl font-extrabold tracking-tight text-[#1D1D1F]">인근 고등학교 수시 합격 DB</h2>
         <p class="text-xs text-[#86868B] font-medium leading-relaxed">
           선생님을 위한 맞춤형 입시 상담 데이터베이스<br>
-          <span class="text-[11px] text-slate-400">성명과 사번(또는 오늘 날짜 YYYYMMDD)으로 로그인해 주세요.</span>
+          <span class="text-[11px] text-slate-400">성명, 휴대폰 뒷자리 4개, 사번(또는 오늘 날짜 YYYYMMDD)으로 로그인해 주세요.</span>
         </p>
       </div>
 
@@ -44,18 +44,18 @@
           </label>
           <div class="relative">
             <i data-lucide="user" class="w-4 h-4 text-[#86868B] absolute left-4 top-1/2 -translate-y-1/2"></i>
-            <input type="text" id="login-name" required placeholder="예: 라종윤, 조재덕" class="w-full bg-[#F5F5F7] border-0 rounded-2xl pl-11 pr-4 min-h-[48px] text-xs font-semibold text-[#1D1D1F] placeholder:text-[#86868B] focus:bg-white focus:ring-2 focus:ring-[#007AFF] transition-all">
+            <input type="text" id="login-name" required placeholder="예: 분당러셀" class="w-full bg-[#F5F5F7] border-0 rounded-2xl pl-11 pr-4 min-h-[48px] text-xs font-semibold text-[#1D1D1F] placeholder:text-[#86868B] focus:bg-white focus:ring-2 focus:ring-[#007AFF] transition-all">
           </div>
         </div>
 
-        <!-- 2) 휴대폰 번호 입력 (선택) -->
+        <!-- 2) 휴대폰 뒷자리 4개 입력 (필수) -->
         <div class="space-y-1.5">
           <label for="login-phone" class="block text-xs font-bold text-[#1D1D1F] px-1">
-            휴대폰 번호 <span class="text-[#86868B] font-normal">(선택)</span>
+            휴대폰 뒷자리 4개 입력 <span class="text-rose-500">*</span>
           </label>
           <div class="relative">
             <i data-lucide="smartphone" class="w-4 h-4 text-[#86868B] absolute left-4 top-1/2 -translate-y-1/2"></i>
-            <input type="text" id="login-phone" placeholder="숫자만 입력 (예: 01053042245)" class="w-full bg-[#F5F5F7] border-0 rounded-2xl pl-11 pr-4 min-h-[48px] text-xs font-semibold text-[#1D1D1F] placeholder:text-[#86868B] focus:bg-white focus:ring-2 focus:ring-[#007AFF] transition-all">
+            <input type="text" id="login-phone" required maxlength="4" pattern="\d{4}" placeholder="1234" class="w-full bg-[#F5F5F7] border-0 rounded-2xl pl-11 pr-4 min-h-[48px] text-xs font-semibold text-[#1D1D1F] placeholder:text-[#86868B] focus:bg-white focus:ring-2 focus:ring-[#007AFF] transition-all">
           </div>
         </div>
 
