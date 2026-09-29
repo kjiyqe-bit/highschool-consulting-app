@@ -1,0 +1,2 @@
+# Python 의존성 파일 (Python Standard Library 내장 모듈 사용)
+# Vercel Serverless Function 배포 규격 준수
