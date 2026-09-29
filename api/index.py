@@ -27,7 +27,7 @@ import datetime
 # 1. 구글 스프레드시트 및 Apps Script 기본 정보
 # ===========================================================================
 SPREADSHEET_ID = "1bCdrA4uBZ2wdiwzj5HU8UIHDaGcKeagZGivASk8qcaY"
-DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbx5l_GTVJEv0GvneFJBMLyVb1IHwwOvFq3RqJXZqyks3q9L-bpS534s03BJTPwhm8NR/exec"
+DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbDhQp3TlveBmg2EN9wmekYGqGjmvLPLgkLg1NgfXxoqUmH0J36xFAH3rhJlifYYv0b/exec"
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(CURRENT_DIR)
