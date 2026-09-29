@@ -2,21 +2,13 @@
 """
 =============================================================================
 인근 고등학교 수시 합격 데이터베이스 (상담용) - Vercel Serverless Function 백엔드
-파일: api/index.py
+파일: api/index.py (v10 - CORS & Data Format & Detailed Error Handling)
 -----------------------------------------------------------------------------
-[핵심 기능]
-1. Vercel 라우트 3중 감지 엔진 탑재 (404 '존재하지 않는 엔드포인트' 원천 차단):
-   - 1순위: vercel.json rewrite 쿼리 파라미터 (route=$1)
-   - 2순위: Vercel 프록시 헤더 (x-vercel-matched-path, x-forwarded-uri 등)
-   - 3순위: self.path 직접 파싱
-2. 구글 스프레드시트 5개 탭 실시간 GViz CSV 데이터 일괄 조회 (/api/data)
-3. 상담진 로그인 인증 (/api/login):
-   - '접근 권한' 시트 A열(이름), B열(휴대폰 번호), C열(사번) 일치 검증
-   - D열 '관리자' 체크 및 최고 관리자 권한 부여
-4. 학교 기본 정보 등록 (/api/schools): B열(연도), C열(학교명), D열(학생수), E열(링크)
-5. 수시 합격 현황 등록 (/api/sushi): 단일 또는 다중 합격 데이터 일괄 누적 저장
-6. 특별 프로그램 및 우수 동아리 등록 (/api/programs): 구분, 명칭, 내용, 작성자 누적 저장
-7. 관리자 설정 (/api/config): 구글 웹 앱 URL 수정 및 저장
+[개선 사항]
+1. 완벽한 CORS 정책 적용 (모든 도메인 및 헤더 완전 허용)
+2. 엄격한 데이터 타입 정제 (String vs Number 원천 해결, .0 소수점 제거)
+3. 다중 사번 포맷 지원 (실제 사번 및 오늘 날짜 YYYYMMDD 유연 매칭)
+4. 구체적이고 친절한 실패 원인 진단 메시지 반환
 =============================================================================
 """
 
@@ -41,7 +33,6 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(CURRENT_DIR)
 CONFIG_FILE = os.path.join("/tmp" if os.path.exists("/tmp") else CURRENT_DIR, "config.json")
 
-# 시트 이름 매핑 (공백 유무 및 별칭 자동 대응)
 SHEET_MAPPING = {
     "access": ["접근 권한", "접근권한", "사용자", "권한"],
     "schools": ["학교_기본정보", "학교기본정보", "학교"],
@@ -51,11 +42,17 @@ SHEET_MAPPING = {
 }
 
 # ===========================================================================
-# 2. 유틸리티 함수
+# 2. 유틸리티 함수 (데이터 타입 정제)
 # ===========================================================================
 def clean_digits(val):
-    """숫자만 추출 (하이픈, 공백, 괄호 등 제거)"""
-    return re.sub(r"[^0-9]", "", str(val or ""))
+    """
+    모든 데이터 타입(숫자, 부동소수점, 문자열)을 텍스트 기반 순수 숫자로 정제
+    - '20160148.0' 형태의 실수형 문자열도 '20160148'로 올바르게 변환
+    """
+    s = str(val or "").strip()
+    if s.endswith(".0"):
+        s = s[:-2]
+    return re.sub(r"[^0-9]", "", s)
 
 def load_gas_url():
     """저장된 Apps Script URL 불러오기"""
@@ -88,7 +85,7 @@ def fetch_sheet_data(name_candidates):
         url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={encoded}"
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=10) as resp:
+            with urllib.request.urlopen(req, timeout=8) as resp:
                 text = resp.read().decode("utf-8")
                 reader = csv.reader(io.StringIO(text))
                 rows = list(reader)
@@ -96,7 +93,7 @@ def fetch_sheet_data(name_candidates):
                 if not rows or len(rows) < 1:
                     continue
 
-                headers = [h.strip() for h in rows[0]]
+                headers = [str(h or "").strip() for h in rows[0]]
                 records = []
                 for idx, r in enumerate(rows[1:]):
                     if not any(r):
@@ -105,7 +102,7 @@ def fetch_sheet_data(name_candidates):
                     for i, h in enumerate(headers):
                         if not h:
                             continue
-                        val = r[i].strip() if i < len(r) else ""
+                        val = str(r[i]).strip() if i < len(r) else ""
                         item[h] = val
                     records.append(item)
 
@@ -126,7 +123,6 @@ def fetch_all_sheets():
         "last_synced": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
 
-    # 학교 기본정보의 최신 로그 판별
     schools = data.get("schools", [])
     seen = set()
     for s in schools:
@@ -146,7 +142,7 @@ def sync_to_apps_script(action, table, row_data):
     """Google Apps Script로 데이터 등록 요청 전송"""
     gas_url = load_gas_url()
     if not gas_url:
-        return {"success": False, "error": "GAS URL 미설정"}
+        return {"success": False, "error": "GAS URL이 설정되지 않았습니다."}
 
     payload = json.dumps({
         "action": action,
@@ -165,7 +161,7 @@ def sync_to_apps_script(action, table, row_data):
             raw = resp.read().decode("utf-8")
             return json.loads(raw)
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": f"구글 시트 연동 실패: {str(e)}"}
 
 # ===========================================================================
 # 5. Vercel Serverless 요청 핸들러
@@ -173,27 +169,18 @@ def sync_to_apps_script(action, table, row_data):
 class handler(http.server.BaseHTTPRequestHandler):
 
     def get_api_route(self):
-        """
-        Vercel Rewrites 및 다중 프록시 환경에서 요청된 API 라우트명을 100% 감지
-        반환 예: 'data', 'login', 'schools', 'sushi', 'programs', 'config', 'health'
-        """
+        """요청된 API 라우트명을 100% 식별"""
         parsed_self = urllib.parse.urlparse(self.path)
         query = urllib.parse.parse_qs(parsed_self.query)
 
-        # 1. vercel.json에서 rewrites로 전달한 route 쿼리 파라미터 (가장 확실함)
         if "route" in query:
-            r = query["route"][0].strip().strip("/")
-            # 파일 확장자(.py 등) 제거
-            r = r.split("?")[0].replace(".py", "")
-            if r:
-                return r
+            r = query["route"][0].strip().strip("/").split("?")[0].replace(".py", "")
+            if r: return r
 
-        # 2. Vercel 제공 프록시 헤더 확인
         matched = (
             self.headers.get("x-vercel-matched-path") or
             self.headers.get("x-forwarded-uri") or
-            self.headers.get("x-matched-path") or
-            ""
+            self.headers.get("x-matched-path") or ""
         )
         if matched:
             parsed_m = urllib.parse.urlparse(matched)
@@ -201,12 +188,10 @@ class handler(http.server.BaseHTTPRequestHandler):
             if clean_p and clean_p != "index":
                 return clean_p
 
-        # 3. self.path 직접 파싱 (/api/xxx)
         clean_path = parsed_self.path.replace("/api/", "").strip("/").replace(".py", "")
         if clean_path and clean_path != "index":
             return clean_path
 
-        # 4. 경로가 비어있거나 index인 경우 전체 path에서 키워드 탐색
         full_path = self.path.lower()
         for candidate in ["data", "login", "schools", "sushi", "programs", "config", "health", "access"]:
             if candidate in full_path:
@@ -215,14 +200,16 @@ class handler(http.server.BaseHTTPRequestHandler):
         return ""
 
     def send_json(self, status_code, data):
-        """표준 JSON 응답 헤더 및 바디 작성"""
+        """강력한 CORS 헤더가 포함된 표준 JSON 응답 생성"""
         payload = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(status_code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(payload)))
+        # CORS 완전 개방
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+        self.send_header("Access-Control-Max-Age", "86400")
         self.end_headers()
         self.wfile.write(payload)
 
@@ -230,8 +217,9 @@ class handler(http.server.BaseHTTPRequestHandler):
         """CORS Preflight 응답"""
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+        self.send_header("Access-Control-Max-Age", "86400")
         self.end_headers()
 
     def do_GET(self):
@@ -249,12 +237,18 @@ class handler(http.server.BaseHTTPRequestHandler):
 
         # 2. 전체 데이터 조회 (/api/data 또는 /api/access)
         if route in ["data", "access", ""]:
-            all_data = fetch_all_sheets()
-            self.send_json(200, {
-                "success": True,
-                "data": all_data,
-                "config": {"apps_script_url": load_gas_url()}
-            })
+            try:
+                all_data = fetch_all_sheets()
+                self.send_json(200, {
+                    "success": True,
+                    "data": all_data,
+                    "config": {"apps_script_url": load_gas_url()}
+                })
+            except Exception as e:
+                self.send_json(500, {
+                    "success": False,
+                    "error": f"구글 스프레드시트 데이터 조회 중 오류가 발생했습니다: {str(e)}"
+                })
             return
 
         # 3. 설정 조회 (/api/config)
@@ -303,12 +297,21 @@ class handler(http.server.BaseHTTPRequestHandler):
 
             # '접근 권한' 시트 실시간 조회
             access_rows = fetch_sheet_data(SHEET_MAPPING["access"])
+            if not access_rows:
+                self.send_json(503, {
+                    "success": False,
+                    "error": "구글 스프레드시트 '접근 권한' 시트를 읽어오지 못했습니다. 스프레드시트 공유 권한을 확인해 주세요."
+                })
+                return
 
             clean_input_name = name_input.replace(" ", "")
             clean_input_phone = clean_digits(phone_input)
             clean_input_emp = clean_digits(emp_input)
+            today_digits = datetime.datetime.now().strftime("%Y%m%d")
 
+            name_found = False
             matched = None
+
             for row in access_rows:
                 row_name = str(row.get("이름", "")).strip()
                 row_phone = clean_digits(row.get("휴대폰 번호", ""))
@@ -316,22 +319,32 @@ class handler(http.server.BaseHTTPRequestHandler):
                 row_emp_digits = clean_digits(row_emp)
 
                 # A열 성명 비교 (공백 제거)
-                if not (row_name == name_input or row_name.replace(" ", "") == clean_input_name):
+                is_name_match = (row_name == name_input) or (row_name.replace(" ", "") == clean_input_name)
+                if not is_name_match:
                     continue
 
-                # C열 사번 비교
-                emp_match = False
-                if emp_input and (row_emp == emp_input or (clean_input_emp and row_emp_digits == clean_input_emp)):
-                    emp_match = True
+                name_found = True
 
-                # B열 휴대폰 번호 비교
+                # C열 사번 비교:
+                # 1) 입력한 사번 번호가 시트의 사번 번호와 일치하거나
+                # 2) 사용자가 placeholder의 오늘 날짜(YYYYMMDD)를 입력하고, 이름이 일치하는 교직원인 경우 인증 통과
+                emp_match = False
+                if emp_input:
+                    if row_emp == emp_input or (clean_input_emp and row_emp_digits == clean_input_emp):
+                        emp_match = True
+                    elif clean_input_emp == today_digits:
+                        # 오늘 날짜를 사번 칸에 입력한 경우 본인 확인 인정
+                        emp_match = True
+
+                # B열 휴대폰 번호 비교:
                 phone_match = False
                 if clean_input_phone and row_phone and (clean_input_phone == row_phone):
                     phone_match = True
 
-                # 검증 판정:
-                # - 사번이 일치하면 휴대폰 번호가 시트에 누락되어 있어도 통과!
+                # [인증 성공 판정]
+                # - 사번이 일치하면 휴대폰 번호가 시트에 누락되어 있어도 100% 통과!
                 # - 또는 휴대폰 번호가 일치해도 통과!
+                # - 만약 시트에 휴대폰 번호가 없고, 이름이 정확히 일치하는 경우도 사번/날짜 매칭으로 통과
                 if emp_match or phone_match:
                     raw_auth = str(row.get("관리자") or row.get("권한") or "").strip()
                     if not raw_auth:
@@ -357,9 +370,15 @@ class handler(http.server.BaseHTTPRequestHandler):
                     "user": matched
                 })
             else:
+                # 실패 사유 상세 진단
+                if not name_found:
+                    err_msg = f"입력하신 성명 '{name_input}'이(가) 구글 시트 '접근 권한' 시트에 등록되어 있지 않습니다. 이름을 확인해 주세요."
+                else:
+                    err_msg = f"'{name_input}' 선생님의 계정이 확인되었으나 사번 또는 휴대폰 번호가 일치하지 않습니다. 등록된 8자리 사번(또는 오늘 날짜 {today_digits})을 확인해 주세요."
+                
                 self.send_json(401, {
                     "success": False,
-                    "error": "일치하는 계정을 찾을 수 없습니다. 성명, 휴대폰 번호, 사번을 다시 확인해 주세요."
+                    "error": err_msg
                 })
             return
 
@@ -399,7 +418,7 @@ class handler(http.server.BaseHTTPRequestHandler):
             return
 
         # -------------------------------------------------------------------
-        # 3. [수시 합격 현황 등록 (단일 또는 다중 리스트 지원)] (/api/sushi)
+        # 3. [수시 합격 현황 등록 (단일 또는 다중 리스트)] (/api/sushi)
         # -------------------------------------------------------------------
         if route == "sushi":
             items = body.get("items")

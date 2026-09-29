@@ -641,6 +641,31 @@
     <option value="이매고등학교"></option>
   </datalist>
 
+  <!-- 친절한 오류 안내 모달 (화면 멈춤 방지) -->
+  <div id="error-alert-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-rose-100 space-y-4 modal-animate">
+      <div class="flex items-center gap-3 text-rose-600">
+        <div class="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center flex-shrink-0">
+          <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h4 id="error-modal-title" class="text-sm font-black text-slate-900">확인이 필요합니다</h4>
+          <p class="text-[11px] text-slate-400">안내 내용을 확인 후 다시 시도해 주세요.</p>
+        </div>
+      </div>
+      
+      <div class="p-4 rounded-2xl bg-rose-50/70 border border-rose-200 text-xs text-rose-800 leading-relaxed font-medium whitespace-pre-wrap" id="error-modal-message">
+        오류 내용이 표시됩니다.
+      </div>
+
+      <div class="pt-2 flex justify-end">
+        <button onclick="closeErrorModal()" class="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-md">
+          확인 및 다시 시도
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- 토스트 알림 컨테이너 -->
   <div id="toast" class="fixed bottom-6 right-6 z-50 hidden px-4 py-3 rounded-2xl shadow-xl text-xs font-semibold text-white flex items-center gap-2 transition-all"></div>
 

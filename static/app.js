@@ -119,12 +119,20 @@ async function handleLoginSubmit(event) {
       sessionStorage.setItem('consulting_user', JSON.stringify(result.user));
       applyUserSession();
       showToast(`${result.user.name}님 환영합니다! (${result.user.role_label})`, 'success');
+      
+      // 사용자 요구사항 반영: 로그인 성공 시 즉시 '입력 탭'으로 자동 전환!
+      switchMainTab('input');
+      
       await loadData();
     } else {
-      showLoginError(result.error || '접근 권한이 없습니다. 성명, 휴대폰 번호, 사번을 다시 확인해 주세요.');
+      const errMsg = result.error || '접근 권한이 없습니다. 성명, 휴대폰 번호, 사번을 다시 확인해 주세요.';
+      showLoginError(errMsg);
+      showErrorModal('로그인 인증 실패', errMsg);
     }
   } catch (err) {
-    showLoginError('서버 통신 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+    const netErr = '서버 통신 중 오류가 발생했습니다. 네트워크 또는 구글 시트 연결 상태를 확인해 주세요.';
+    showLoginError(netErr);
+    showErrorModal('통신 오류', netErr);
   } finally {
     submitBtn.disabled = false;
     submitBtn.innerHTML = `<span>인증 및 상담 시스템 접속</span><i data-lucide="arrow-right" class="w-4 h-4"></i>`;
@@ -249,9 +257,19 @@ function switchSubTab(subTab) {
 // 5. 서버 데이터 로딩 및 동기화
 // ===================================================================
 async function loadData() {
+  const syncEl = document.getElementById('stat-last-synced');
+  const countBadge = document.getElementById('school-count-badge');
+  if (countBadge) countBadge.textContent = '동기화 중...';
+
+  // 8초 타임아웃 제어용 AbortController
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+
   try {
-    const res = await fetch('/api/data');
-    if (!res.ok) throw new Error('응답 실패');
+    const res = await fetch('/api/data', { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) throw new Error(`서버 응답 오류 (HTTP ${res.status})`);
 
     const result = await res.json();
     if (result.success && result.data) {
@@ -262,15 +280,23 @@ async function loadData() {
       if (result.config) state.config = result.config;
 
       // 동기화 시간 표시
-      const syncEl = document.getElementById('stat-last-synced');
       if (syncEl) syncEl.textContent = result.data.last_synced || '방금 전';
 
       // 통계 및 리스트 갱신
       updateStatistics();
       renderSchoolList();
+    } else {
+      throw new Error(result.error || '구글 시트 데이터 형식이 올바르지 않습니다.');
     }
   } catch (err) {
+    clearTimeout(timeoutId);
     console.error('[데이터 로딩 실패]', err);
+    if (syncEl) syncEl.textContent = '동기화 지연';
+    if (countBadge) countBadge.textContent = '동기화 지연';
+
+    if (err.name === 'AbortError') {
+      showErrorModal('구글 시트 연동 지연', '구글 시트 데이터 로딩 시간(8초)이 초과되었습니다.\n상단 우측의 [동기화] 버튼을 눌러 다시 시도하거나 인터넷 연결을 확인해 주세요.');
+    }
   }
 }
 
@@ -868,3 +894,54 @@ function showToast(message, type = 'info') {
     toast.classList.add('hidden');
   }, 3500);
 }
+
+/**
+ * 에러/경고 안내 전용 모달 창 표시
+ * @param {string} title 안내 제목
+ * @param {string} message 세부 안내 내용
+ */
+function showErrorModal(title, message) {
+  const modal = document.getElementById('error-alert-modal');
+  const titleEl = document.getElementById('error-modal-title');
+  const msgEl = document.getElementById('error-modal-message');
+
+  if (titleEl) titleEl.textContent = title || '확인이 필요합니다';
+  if (msgEl) msgEl.textContent = message || '오류가 발생했습니다.';
+
+  if (modal) {
+    modal.classList.remove('hidden');
+    if (window.lucide) lucide.createIcons();
+  }
+}
+
+/**
+ * 에러/경고 안내 전용 모달 창 닫기
+ */
+function closeErrorModal() {
+  const modal = document.getElementById('error-alert-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+  }
+}
+
+// HTML 인라인 온클릭 이벤트 및 외부 호출을 위한 전역 스코프 등록
+window.handleLoginSubmit = handleLoginSubmit;
+window.handleLogout = handleLogout;
+window.switchMainTab = switchMainTab;
+window.switchSubTab = switchSubTab;
+window.refreshData = refreshData;
+window.openSchoolModal = openSchoolModal;
+window.closeSchoolModal = closeSchoolModal;
+window.openSchoolDetailModal = openSchoolModal;
+window.closeSchoolDetailModal = closeSchoolModal;
+window.addSushiSubRow = addSushiSubRow;
+window.removeSushiSubRow = removeSushiSubRow;
+window.handleSushiSubmit = handleSushiSubmit;
+window.handleProgramSubmit = handleProgramSubmit;
+window.handleSchoolSubmit = handleSchoolSubmit;
+window.openAdminModal = openAdminModal;
+window.closeAdminModal = closeAdminModal;
+window.saveAdminConfig = saveAdminConfig;
+window.showErrorModal = showErrorModal;
+window.closeErrorModal = closeErrorModal;
+
