@@ -47,8 +47,8 @@ SHEET_NAMES = {
 GOOGLE_DRIVE_FOLDER_ID = "1VV99M5R7i0392maHg3qyK5GYodGoNnrf"
 GOOGLE_DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1VV99M5R7i0392maHg3qyK5GYodGoNnrf?usp=drive_link"
 
-# 기본 Google Apps Script 웹앱 URL
-DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbxG-SFxybt7fjzS0dj77_xojo03iJqn3D5M8Jz3mTxXWKnmJAWdn-qDh5_rWkaDFxub/exec"
+# 기본 Google Apps Script 웹앱 URL (사용자 제공 최신 배포 URL)
+DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbx5l_GTVJEv0GvneFJBMLyVb1IHwwOvFq3RqJXZqyks3q9L-bpS534s03BJTPwhm8NR/exec"
 
 # 프로젝트 루트 경로 탐색
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -107,6 +107,7 @@ def fetch_from_google_sheets():
     """
     구글 스프레드시트의 5개 시트에서 최신 데이터를 CSV로 추출하여 JSON 구조로 변환
     - GID 대신 시트 이름(sheet=접근 권한 등)을 사용하여 100% 일치 보장
+    - 시트 이름 변경(공백 유무)에 대비한 다중 대체 시트명 2중 조회
     """
     data = {
         "access": [],
@@ -117,36 +118,49 @@ def fetch_from_google_sheets():
         "last_synced": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
 
-    for key, sheet_name in SHEET_NAMES.items():
-        encoded_name = urllib.parse.quote(sheet_name)
-        url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={encoded_name}"
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                csv_text = resp.read().decode("utf-8")
-                reader = csv.reader(io.StringIO(csv_text))
-                rows = list(reader)
+    # 주요 시트명 및 대체 시트명 후보 목록
+    sheet_candidates = {
+        "access": ["접근 권한", "접근권한", "사용자", "권한"],
+        "schools": ["학교_기본정보", "학교기본정보", "학교_기본_정보", "학교정보"],
+        "sushi": ["수시합격_입력", "수시합격", "수시_합격"],
+        "programs": ["특별프로그램_입력", "특별프로그램", "프로그램"],
+        "dashboard": ["대시보드_집계용", "학교별_대시보드", "대시보드"]
+    }
 
-                if not rows or len(rows) < 1:
-                    continue
+    for key, name_list in sheet_candidates.items():
+        records = []
+        for sheet_name in name_list:
+            encoded_name = urllib.parse.quote(sheet_name)
+            url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={encoded_name}"
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    csv_text = resp.read().decode("utf-8")
+                    reader = csv.reader(io.StringIO(csv_text))
+                    rows = list(reader)
 
-                headers = [h.strip() for h in rows[0]]
-                records = []
-
-                for row_idx, r in enumerate(rows[1:]):
-                    if not any(r):
+                    if not rows or len(rows) < 1:
                         continue
-                    item = {"_id": f"row_{key}_{row_idx + 1}"}
-                    for i, h in enumerate(headers):
-                        if not h:
-                            continue
-                        val = r[i].strip() if i < len(r) else ""
-                        item[h] = val
-                    records.append(item)
 
-                data[key] = records
-        except Exception as e:
-            print(f"[구글 시트 연동 오류: {key} ({sheet_name})] {e}")
+                    headers = [h.strip() for h in rows[0]]
+                    temp_records = []
+                    for row_idx, r in enumerate(rows[1:]):
+                        if not any(r):
+                            continue
+                        item = {"_id": f"row_{key}_{row_idx + 1}"}
+                        for i, h in enumerate(headers):
+                            if not h:
+                                continue
+                            val = r[i].strip() if i < len(r) else ""
+                            item[h] = val
+                        temp_records.append(item)
+
+                    if temp_records:
+                        records = temp_records
+                        break # 성공적으로 읽었으면 다음 시트로 진행
+            except Exception as e:
+                pass
+        data[key] = records
 
     # 학교_기본정보 시트의 학교코드별 최신 로그 태깅
     schools = data.get("schools", [])

@@ -64,12 +64,12 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /**
- * 사번 입력 칸의 안내 문구 설정 (8자리 사번 예시)
+ * 사번 입력 칸의 안내 문구 설정 (요구사항: '20260929' 표시)
  */
 function setupEmpNoPlaceholder() {
   const empInput = document.getElementById('login-emp-no');
   if (empInput) {
-    empInput.placeholder = "사번 8자리 (예: 20160148)";
+    empInput.placeholder = "20260929";
   }
 }
 
