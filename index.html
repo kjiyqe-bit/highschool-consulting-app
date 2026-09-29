@@ -3,119 +3,47 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>고교 수시 합격 및 학교별 정보 대시보드</title>
+  <title>고교 수시 상담센터 | 사내 통합 시스템</title>
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
-
-  <!-- Google Web Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-
-  <link rel="stylesheet" href="style.css">
+  
   <style>
-    /* ====================================================================
-       모달 팝업 및 핵심 상호작용 스타일 (인라인 내장으로 404 방지)
-       ==================================================================== */
-    body {
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+    * { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif; }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
-    .nav-item.active {
-      background-color: #1e293b;
-      color: #ffffff;
-      border-left: 3px solid #3b82f6;
-    }
-    .mob-nav-item.active {
-      color: #2563eb;
-    }
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #f1f5f9;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #cbd5e1;
-      border-radius: 9999px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #94a3b8;
-    }
-    /* 모달 표시 핵심 클래스 - 이것이 누락되면 투명한 상태로 화면이 굳어버림 */
-    .modal-show {
-      opacity: 1 !important;
-      pointer-events: auto !important;
-    }
-    .modal-show #detail-modal-box,
-    .modal-show .transform {
-      transform: scale(1) !important;
-    }
-    .school-card {
-      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-    }
-    .school-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
-      border-color: #93c5fd;
-    }
-    @keyframes toastIn {
-      from { transform: translateY(-20px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-    .toast-animate {
-      animation: toastIn 0.25s ease-out forwards;
+    .fade-in {
+      animation: fadeIn 0.3s ease-out forwards;
     }
   </style>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', 'sans-serif'],
-          },
-          colors: {
-            brand: {
-              50: '#eff6ff',
-              100: '#dbeafe',
-              500: '#3b82f6',
-              600: '#2563eb',
-              700: '#1d4ed8',
-              800: '#1e40af',
-              900: '#1e3a8a',
-            }
-          }
-        }
-      }
-    }
-  </script>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen">
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col justify-between">
 
   <!-- ================================================================= -->
-  <!-- 0. [인증 화면] 로그인 오버레이 (성명/휴대폰/사번 예시 적용) -->
+  <!-- 1. [로그인 화면] 상담진 로그인 모달 (1단계 중심 화면) -->
   <!-- ================================================================= -->
-  <div id="login-overlay" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-slate-100 space-y-6">
+  <div id="login-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-slate-100 space-y-6 fade-in">
       
-      <!-- 로고 및 헤더 -->
+      <!-- 헤더 아이콘 & 타이틀 -->
       <div class="text-center space-y-2">
         <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white mx-auto shadow-lg shadow-blue-500/30">
           <i data-lucide="shield-check" class="w-8 h-8"></i>
         </div>
-        <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">상담진 로그인</h2>
+        <h2 class="text-2xl font-black text-slate-900 tracking-tight">상담진 로그인</h2>
         <p class="text-xs text-slate-500">구글 스프레드시트 <b>'접근 권한'</b> 시트에 등록된 계정으로 인증합니다.</p>
       </div>
 
-      <!-- 로그인 폼 -->
+      <!-- 로그인 입력 폼 -->
       <form id="login-form" onsubmit="handleLoginSubmit(event)" class="space-y-4">
         
-        <!-- 1. 성명(이름) 칸: 필수 -->
+        <!-- 1. 성명(이름) -->
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
             <span class="flex items-center gap-1.5">
@@ -127,19 +55,19 @@
           <input type="text" id="login-name" required placeholder="성명 입력 (예: 라종윤)" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none transition-all">
         </div>
 
-        <!-- 2. 사번 칸: 필수 (8자리 고유 사번) -->
+        <!-- 2. 사번 (요구사항: 예시 '20260929' 표시) -->
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
             <span class="flex items-center gap-1.5">
               <i data-lucide="badge-check" class="w-3.5 h-3.5 text-slate-400"></i>
-              <span>사번(8자리) <span class="text-rose-500">*</span></span>
+              <span>사번 <span class="text-rose-500">*</span></span>
             </span>
             <span class="text-[11px] text-blue-600 font-medium">예시: 20260929</span>
           </label>
           <input type="text" id="login-emp-no" required placeholder="20260929" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none transition-all font-mono">
         </div>
 
-        <!-- 3. 휴대폰 번호 칸: 선택 사항 (시트에 번호가 없어도 사번으로 로그인 가능) -->
+        <!-- 3. 휴대폰 번호 (선택 사항) -->
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
             <span class="flex items-center gap-1.5">
@@ -148,16 +76,16 @@
             </span>
             <span class="text-[11px] text-slate-400 font-normal">선택 사항</span>
           </label>
-          <input type="text" id="login-phone" placeholder="휴대폰 번호 (선택, 숫자만)" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none transition-all">
+          <input type="text" id="login-phone" placeholder="휴대폰 번호 (선택 사항)" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none transition-all">
         </div>
 
-        <!-- 오류 메시지 -->
+        <!-- 오류 알림 박스 -->
         <div id="login-error-msg" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-600 font-semibold flex items-center gap-2">
           <i data-lucide="alert-circle" class="w-4 h-4 flex-shrink-0"></i>
-          <span id="login-error-text">접근 권한이 없습니다. 성명과 사번을 확인해 주세요.</span>
+          <span id="login-error-text">입력하신 정보를 확인해 주세요.</span>
         </div>
 
-        <!-- 로그인 버튼 -->
+        <!-- 제출 버튼 -->
         <button type="submit" id="login-submit-btn" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/25 transition-all active:scale-98 flex items-center justify-center gap-2">
           <span>인증 및 시스템 접속</span>
           <i data-lucide="arrow-right" class="w-4 h-4"></i>
@@ -165,966 +93,110 @@
 
       </form>
 
+      <!-- 하단 안내 -->
+      <div class="pt-2 border-t border-slate-100 text-center">
+        <p class="text-[11px] text-slate-400">1단계: 구글 스프레드시트 '접근 권한' 실시간 연동</p>
+      </div>
+
     </div>
   </div>
 
   <!-- ================================================================= -->
-  <!-- 메인 앱 레이아웃 -->
+  <!-- 2. [로그인 완료 화면] 1단계 성공 대시보드 쉘 -->
   <!-- ================================================================= -->
-  <div id="app-container" class="flex flex-col md:flex-row min-h-screen">
-
-    <!-- =============================================================== -->
-    <!-- 1. 사이드바 네비게이션 (데스크톱) - 탭 명칭 완벽 수정 -->
-    <!-- =============================================================== -->
-    <aside class="w-full md:w-64 bg-slate-900 text-slate-200 flex-shrink-0 flex flex-col justify-between hidden md:flex min-h-screen shadow-xl z-20">
-      <div>
-        <div class="p-6 border-b border-slate-800">
-          <div class="flex items-center space-x-3">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
-              <i data-lucide="graduation-cap" class="w-6 h-6"></i>
-            </div>
-            <div>
-              <h1 class="font-bold text-base text-white leading-tight">고교 수시 상담센터</h1>
-              <span class="text-xs text-blue-400 font-medium tracking-wide">사내 데이터베이스 v4</span>
-            </div>
+  <div id="app-container" class="hidden min-h-screen flex flex-col">
+    
+    <!-- 네비게이션 헤더 -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+      <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+            <i data-lucide="graduation-cap" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h1 class="text-sm font-bold text-slate-900 leading-tight">고교 수시 상담센터</h1>
+            <span class="text-[10px] text-blue-600 font-semibold">1단계: 인증 및 구글 시트 연동 완료</span>
           </div>
         </div>
 
-        <!-- 로그인 프로필 -->
-        <div class="p-4 border-b border-slate-800/80 bg-slate-950/40">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-2.5">
-              <div class="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-xs">
-                <span id="user-avatar">?</span>
-              </div>
-              <div class="min-w-0">
-                <div class="flex items-center gap-1.5">
-                  <span id="user-name-display" class="font-bold text-xs text-white truncate">상담사</span>
-                  <span id="user-role-badge" class="text-[9px] px-1.5 py-0.2 rounded font-bold bg-slate-700 text-slate-300">일반</span>
-                </div>
-                <p id="user-emp-display" class="text-[10px] text-slate-400 font-mono">사번: -</p>
-              </div>
+        <!-- 로그인 사용자 프로필 및 로그아웃 -->
+        <div class="flex items-center gap-3">
+          <div class="text-right">
+            <div class="flex items-center gap-1.5 justify-end">
+              <span id="header-user-name" class="text-xs font-bold text-slate-800">라종윤</span>
+              <span id="header-user-badge" class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-800 border border-amber-300">관리자</span>
             </div>
-            <button onclick="handleLogout()" title="로그아웃" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors">
-              <i data-lucide="log-out" class="w-4 h-4"></i>
-            </button>
+            <span id="header-user-emp" class="text-[10px] text-slate-400 font-mono">사번: 20160148</span>
           </div>
-        </div>
-
-        <!-- 메인 탭 메뉴 (요청하신 4대 명칭 완벽 적용) -->
-        <nav class="p-4 space-y-1.5">
-          <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 mb-2">데이터 입력 & 관리</div>
-          
-          <!-- [입력 탭 1] 학교 기본 정보 입력 -->
-          <button onclick="switchTab('tab-school-info')" id="nav-tab-school-info" class="nav-item w-full flex items-center justify-between px-3.5 py-3 rounded-xl font-medium text-sm transition-all duration-200 hover:bg-slate-800 hover:text-white group">
-            <div class="flex items-center space-x-3">
-              <i data-lucide="school" class="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform"></i>
-              <span>학교 기본 정보 입력</span>
-            </div>
-            <span class="text-[10px] bg-cyan-900/60 text-cyan-300 px-2 py-0.5 rounded-full font-bold">Form 1</span>
-          </button>
-
-          <!-- [입력 탭 2] 수시 합격 입력 (수정됨) -->
-          <button onclick="switchTab('tab-sushi')" id="nav-tab-sushi" class="nav-item w-full flex items-center justify-between px-3.5 py-3 rounded-xl font-medium text-sm transition-all duration-200 hover:bg-slate-800 hover:text-white group">
-            <div class="flex items-center space-x-3">
-              <i data-lucide="file-plus" class="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform"></i>
-              <span>수시 합격 입력</span>
-            </div>
-            <span class="text-[10px] bg-blue-900/60 text-blue-300 px-2 py-0.5 rounded-full font-bold">Form 2</span>
-          </button>
-
-          <!-- [입력 탭 3] 특별 프로그램 입력 (수정됨) -->
-          <button onclick="switchTab('tab-programs')" id="nav-tab-programs" class="nav-item w-full flex items-center justify-between px-3.5 py-3 rounded-xl font-medium text-sm transition-all duration-200 hover:bg-slate-800 hover:text-white group">
-            <div class="flex items-center space-x-3">
-              <i data-lucide="sparkles" class="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform"></i>
-              <span>특별 프로그램 입력</span>
-            </div>
-            <span class="text-[10px] bg-amber-900/60 text-amber-300 px-2 py-0.5 rounded-full font-bold">Form 3</span>
-          </button>
-
-          <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 mt-6 mb-2">상담 전용 뷰어</div>
-          
-          <!-- [보기 탭] 학교별 정보 대시보드 (수정됨) -->
-          <button onclick="switchTab('tab-dashboard')" id="nav-tab-dashboard" class="nav-item w-full flex items-center justify-between px-3.5 py-3 rounded-xl font-medium text-sm transition-all duration-200 hover:bg-slate-800 hover:text-white group">
-            <div class="flex items-center space-x-3">
-              <i data-lucide="layout-dashboard" class="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform"></i>
-              <span>학교별 정보 대시보드</span>
-            </div>
-            <span class="text-[10px] bg-emerald-900/60 text-emerald-300 px-2 py-0.5 rounded-full font-bold">View</span>
-          </button>
-        </nav>
-      </div>
-
-      <!-- 하단 연동 설정 -->
-      <div class="p-4 border-t border-slate-800 space-y-3">
-        <div class="bg-slate-800/80 rounded-xl p-3 border border-slate-700/60">
-          <div class="flex items-center justify-between text-xs text-slate-300 mb-1.5">
-            <span class="flex items-center gap-1.5 font-medium">
-              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              구글 시트 연동
-            </span>
-            <span id="sync-status" class="text-[10px] text-slate-400">정상 연결</span>
-          </div>
-          <div class="text-[11px] text-slate-400 truncate">
-            ID: <span class="text-slate-300 font-mono">1bCdrA4u...</span>
-          </div>
-        </div>
-
-        <div class="flex gap-2">
-          <button id="admin-settings-btn" onclick="openSettingsModal()" class="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition-colors">
-            <i data-lucide="settings" class="w-3.5 h-3.5"></i>
-            <span>연동 설정</span>
-          </button>
-          <button onclick="refreshData()" title="구글 시트 실시간 새로고침" class="flex items-center justify-center p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition-colors">
-            <i data-lucide="rotate-cw" id="refresh-icon" class="w-4 h-4"></i>
+          <button onclick="handleLogout()" class="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200 flex items-center gap-1">
+            <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+            <span>로그아웃</span>
           </button>
         </div>
-      </div>
-    </aside>
-
-    <!-- =============================================================== -->
-    <!-- 2. 모바일 상단 헤더 -->
-    <!-- =============================================================== -->
-    <header class="md:hidden bg-slate-900 text-white p-4 flex items-center justify-between sticky top-0 z-30 shadow-md">
-      <div class="flex items-center space-x-2.5">
-        <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
-          <i data-lucide="graduation-cap" class="w-5 h-5"></i>
-        </div>
-        <span class="font-bold text-sm">고교 수시 상담센터</span>
-      </div>
-      <div class="flex items-center space-x-2">
-        <span id="mob-user-badge" class="text-[10px] bg-blue-900 text-blue-200 px-2 py-0.5 rounded font-semibold">-</span>
-        <button onclick="refreshData()" class="p-2 text-slate-300 hover:text-white">
-          <i data-lucide="rotate-cw" class="w-4 h-4"></i>
-        </button>
-        <button onclick="handleLogout()" class="p-2 text-slate-300 hover:text-rose-400">
-          <i data-lucide="log-out" class="w-4 h-4"></i>
-        </button>
       </div>
     </header>
 
-    <!-- =============================================================== -->
-    <!-- 3. 메인 콘텐츠 컨테이너 -->
-    <!-- =============================================================== -->
-    <main class="flex-1 flex flex-col min-w-0 pb-20 md:pb-6 overflow-y-auto max-h-screen">
+    <!-- 메인 본문 컨텐츠 (1단계 성공 알림 카드) -->
+    <main class="max-w-4xl mx-auto px-4 py-12 flex-1 w-full space-y-6">
       
-      <!-- 상단 헤더 배너 -->
-      <div class="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-xs">
-        <div>
-          <h2 id="page-title" class="text-xl font-bold text-slate-900">학교 기본 정보 입력</h2>
-          <p id="page-desc" class="text-xs text-slate-500 mt-0.5">'학교_기본정보' 시트에 신규 학교 데이터를 등록하고 교과 편성표 파일을 구글 드라이브 폴더와 연계합니다.</p>
+      <div class="bg-white rounded-3xl p-8 border border-slate-200 shadow-xl space-y-6 text-center">
+        <div class="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto shadow-sm">
+          <i data-lucide="check-circle-2" class="w-8 h-8"></i>
         </div>
-        <div class="flex items-center gap-3">
-          <span class="text-xs text-slate-400 bg-slate-100 px-3 py-1.5 rounded-full flex items-center gap-1.5">
-            <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400"></i>
-            <span id="last-sync-time">동기화 확인 중...</span>
-          </span>
-          <button onclick="refreshData()" class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg shadow-2xs transition-all active:scale-95">
-            <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-slate-500"></i>
-            <span>시트 새로고침</span>
-          </button>
+
+        <div class="space-y-1">
+          <h2 class="text-2xl font-black text-slate-900">1단계: 로그인 인증에 성공하였습니다!</h2>
+          <p class="text-sm text-slate-600">구글 스프레드시트 <b>'접근 권한'</b> 시트와 실시간 연동되어 본인 확인이 완료되었습니다.</p>
         </div>
+
+        <!-- 로그인한 사용자 상세 카드 -->
+        <div class="max-w-md mx-auto bg-slate-50 rounded-2xl p-5 border border-slate-200 text-left space-y-3">
+          <div class="flex justify-between items-center text-xs border-b border-slate-200 pb-2">
+            <span class="text-slate-500">성명(이름)</span>
+            <span id="card-user-name" class="font-bold text-slate-900">-</span>
+          </div>
+          <div class="flex justify-between items-center text-xs border-b border-slate-200 pb-2">
+            <span class="text-slate-500">사번</span>
+            <span id="card-user-emp" class="font-mono font-semibold text-slate-800">-</span>
+          </div>
+          <div class="flex justify-between items-center text-xs border-b border-slate-200 pb-2">
+            <span class="text-slate-500">부여된 시스템 권한</span>
+            <span id="card-user-role" class="font-bold text-blue-600">-</span>
+          </div>
+          <div class="flex justify-between items-center text-xs">
+            <span class="text-slate-500">연동 상태</span>
+            <span class="text-emerald-600 font-semibold flex items-center gap-1">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+              정상 연결됨 (온라인)
+            </span>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-blue-50/70 border border-blue-100 text-xs text-blue-800 space-y-1 text-left">
+          <p class="font-bold flex items-center gap-1.5">
+            <i data-lucide="info" class="w-4 h-4 text-blue-600"></i>
+            <span>선생님, 1단계가 완벽하게 준비되었습니다!</span>
+          </p>
+          <p class="text-blue-700/90 leading-relaxed">
+            이제 선생님께서 확인해 주시면, 바로 <b>2단계: 학교별 정보 대시보드</b> (특별 프로그램 명칭 D열과 주요 내용 E열 통합 표출) 구축으로 넘어가겠습니다.
+          </p>
+        </div>
+
       </div>
 
-      <!-- 본문 영역 -->
-      <div class="p-4 md:p-8 space-y-6">
-
-        <!-- ============================================================= -->
-        <!-- [입력 탭 1] 학교 기본 정보 입력 -->
-        <!-- ============================================================= -->
-        <section id="tab-school-info" class="tab-content space-y-6">
-          
-          <div class="bg-white rounded-2xl p-6 md:p-8 border border-slate-200/80 shadow-sm">
-            <div class="flex items-center justify-between border-b border-slate-100 pb-4 mb-6">
-              <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center font-bold">
-                  <i data-lucide="school" class="w-5 h-5"></i>
-                </div>
-                <div>
-                  <h3 class="text-lg font-bold text-slate-900">학교 기본 정보 입력</h3>
-                  <p class="text-xs text-slate-500">'학교_기본정보' 시트에 학교 기초 데이터를 등록합니다. 중복 등록 시 기존 로그는 보존되며 새로운 로그로 누적 반영됩니다.</p>
-                </div>
-              </div>
-              <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-cyan-100 text-cyan-700">이력 로그 누적 지원</span>
-            </div>
-
-            <form id="school-form" onsubmit="handleSchoolSubmit(event)" class="space-y-6">
-              
-              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                <div>
-                  <label class="block text-xs font-semibold text-slate-700 mb-1.5">
-                    연도 (B열) <span class="text-rose-500">*</span>
-                  </label>
-                  <input type="text" id="school-year" required value="2026" oninput="updateGeneratedCodePreview()" placeholder="예: 2026" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:bg-white focus:outline-none transition-all">
-                </div>
-
-                <div>
-                  <label class="block text-xs font-semibold text-slate-700 mb-1.5">
-                    학교명 (C열) <span class="text-rose-500">*</span>
-                  </label>
-                  <input type="text" id="school-name" required oninput="updateGeneratedCodePreview()" placeholder="예: 서울과학고등학교" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:bg-white focus:outline-none transition-all">
-                </div>
-
-                <div>
-                  <label class="block text-xs font-semibold text-slate-700 mb-1.5">
-                    전교 학생수 (D열) <span class="text-rose-500">*</span>
-                  </label>
-                  <input type="text" id="school-students" required placeholder="예: 250" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:bg-white focus:outline-none transition-all">
-                </div>
-              </div>
-
-              <!-- 학교코드 안내 배너 -->
-              <div class="bg-cyan-50/70 border border-cyan-200/80 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div class="flex items-center space-x-3">
-                  <div class="w-8 h-8 rounded-lg bg-cyan-600 text-white flex items-center justify-center font-bold flex-shrink-0">
-                    <i data-lucide="key" class="w-4 h-4"></i>
-                  </div>
-                  <div>
-                    <span class="text-xs font-semibold text-cyan-900">A열 학교 고유번호(학교코드)</span>
-                    <p class="text-[11px] text-cyan-700">연도 + 학교명 앞 4글자로 자동 조합되어 '학교_기본정보' A열 고유값으로 등록됩니다.</p>
-                  </div>
-                </div>
-                <div class="text-left sm:text-right">
-                  <span class="text-[10px] text-slate-500 block">생성 예정 고유번호</span>
-                  <span id="preview-school-code" class="text-sm font-extrabold text-cyan-800 font-mono bg-white px-3 py-1 rounded-lg border border-cyan-300 shadow-2xs">2026미입력</span>
-                </div>
-              </div>
-
-              <!-- 교과 편성표 링크 (E열) 직접 입력 (파일 업로드 기능 제거됨) -->
-              <div class="space-y-1.5">
-                <div class="flex items-center justify-between">
-                  <label class="block text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                    <i data-lucide="link" class="w-3.5 h-3.5 text-cyan-600"></i>
-                    <span>교과 편성표 링크 (E열)</span>
-                  </label>
-                  <a href="https://drive.google.com/drive/folders/1VV99M5R7i0392maHg3qyK5GYodGoNnrf?usp=drive_link" target="_blank" class="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 transition-colors">
-                    <i data-lucide="folder-symlink" class="w-3.5 h-3.5"></i>
-                    <span>지정 구글 드라이브 폴더 열기</span>
-                  </a>
-                </div>
-                <input type="text" id="school-curriculum-url" placeholder="예: 구글 드라이브 링크, 학교 홈페이지 링크 또는 '링크입력예정'" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:bg-white focus:outline-none transition-all">
-                <p class="text-[11px] text-slate-400">
-                  ※ 교과 편성표 파일이 저장된 구글 드라이브 공유 링크나 웹 주소를 입력하세요. (대시보드에서 클릭 시 바로 열립니다)
-                </p>
-              </div>
-
-              <!-- 저장 버튼 -->
-              <div class="flex items-center justify-end pt-2 border-t border-slate-100">
-                <button type="submit" id="school-submit-btn" class="inline-flex items-center gap-2 px-6 py-3 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-semibold rounded-xl shadow-md shadow-cyan-500/20 transition-all active:scale-98">
-                  <i data-lucide="plus-circle" class="w-4 h-4"></i>
-                  <span>학교 기본 정보 등록하기</span>
-                </button>
-              </div>
-
-            </form>
-          </div>
-
-          <!-- 등록된 학교 기본 정보 목록 테이블 (이력 로그 지원) -->
-          <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-            <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
-                  <span>등록된 학교 기본 정보 목록</span>
-                  <span id="schools-count-badge" class="text-xs bg-cyan-50 text-cyan-700 font-semibold px-2.5 py-0.5 rounded-full">0개교</span>
-                </h3>
-                <p class="text-xs text-slate-500 mt-0.5">'학교_기본정보' 시트에 누적된 로그 및 E열 교과 편성표 링크 현황입니다.</p>
-              </div>
-              
-              <div class="flex items-center gap-3">
-                <!-- 최신 정보만 보기 / 전체 이력 로그 보기 필터 -->
-                <label class="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
-                  <input type="checkbox" id="toggle-show-all-logs" onchange="renderSchoolsTable()" class="rounded border-slate-300 text-cyan-600 focus:ring-cyan-500">
-                  <span>과거 이력 로그도 모두 표시</span>
-                </label>
-                <input type="text" id="school-list-search" oninput="renderSchoolsTable()" placeholder="학교명 검색..." class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-cyan-500 w-44">
-              </div>
-            </div>
-
-            <div class="overflow-x-auto">
-              <table class="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200/80">
-                    <th class="py-3 px-4">학교코드(A열)</th>
-                    <th class="py-3 px-4">연도(B열)</th>
-                    <th class="py-3 px-4">학교명(C열)</th>
-                    <th class="py-3 px-4">전교 학생수(D열)</th>
-                    <th class="py-3 px-4">교과 편성표 링크(E열)</th>
-                    <th class="py-3 px-4">데이터 수집 현황(F열)</th>
-                    <th class="py-3 px-4">로그 상태</th>
-                    <th class="py-3 px-4 text-center">관리</th>
-                  </tr>
-                </thead>
-                <tbody id="schools-table-body" class="divide-y divide-slate-100 font-medium"></tbody>
-              </table>
-            </div>
-          </div>
-
-        </section>
-
-        <!-- ============================================================= -->
-        <!-- [입력 탭 2] 수시 합격 입력 (수정된 명칭 반영) -->
-        <!-- ============================================================= -->
-        <section id="tab-sushi" class="tab-content hidden space-y-6">
-          <div class="bg-white rounded-2xl p-6 md:p-8 border border-slate-200/80 shadow-sm">
-            <div class="flex items-center justify-between border-b border-slate-100 pb-4 mb-6">
-              <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-                  <i data-lucide="file-plus" class="w-5 h-5"></i>
-                </div>
-                <div>
-                  <h3 class="text-lg font-bold text-slate-900">수시 합격 입력</h3>
-                  <p class="text-xs text-slate-500">학생의 합격 정보를 입력하여 구글 스프레드시트 '수시합격_입력' 시트에 기록합니다.</p>
-                </div>
-              </div>
-              <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">Add / Edit 권한</span>
-            </div>
-
-            <form id="sushi-form" onsubmit="handleSushiSubmit(event)" class="space-y-5">
-              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <label class="block text-xs font-semibold text-slate-700 mb-1.5">학년도 <span class="text-rose-500">*</span></label>
-                  <select id="sushi-year" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none">
-                    <option value="2026">2026학년도</option>
-                    <option value="2025">2025학년도</option>
-                    <option value="2024">2024학년도</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label class="block text-xs font-semibold text-slate-700 mb-1.5">고등학교명 <span class="text-rose-500">*</span></label>
-                  <input type="text" id="sushi-school" list="school-datalist" placeholder="예: A고등학교" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none">
-                  <datalist id="school-datalist"></datalist>
-                </div>
-
-                <div>
-                  <label class="block text-xs font-semibold text-slate-700 mb-1.5">전교 등수 <span class="text-rose-500">*</span></label>
-                  <select id="sushi-rank" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none">
-                    <option value="">등수 선택</option>
-                    <option value="1등">1등</option>
-                    <option value="2등">2등</option>
-                    <option value="3등">3등</option>
-                    <option value="4등">4등</option>
-                    <option value="5등">5등</option>
-                    <option value="6등">6등</option>
-                    <option value="7등">7등</option>
-                    <option value="8등">8등</option>
-                    <option value="9등">9등</option>
-                    <option value="10등">10등</option>
-                    <option value="기타 최상위">기타 최상위</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label class="block text-xs font-semibold text-slate-700 mb-1.5">내신 평균 등급</label>
-                  <input type="number" step="0.01" min="1.0" max="9.0" id="sushi-grade" placeholder="예: 1.05" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none">
-                </div>
-
-                <div>
-                  <label class="block text-xs font-semibold text-slate-700 mb-1.5">합격 대학 <span class="text-rose-500">*</span></label>
-                  <input type="text" id="sushi-univ" placeholder="예: 서울대학교" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none">
-                </div>
-
-                <div>
-                  <label class="block text-xs font-semibold text-slate-700 mb-1.5">합격 학과 <span class="text-rose-500">*</span></label>
-                  <input type="text" id="sushi-dept" placeholder="예: 의예과" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none">
-                </div>
-
-                <div>
-                  <label class="block text-xs font-semibold text-slate-700 mb-1.5">전형 구분 <span class="text-rose-500">*</span></label>
-                  <select id="sushi-type" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none">
-                    <option value="지역균형">지역균형</option>
-                    <option value="학생부종합">학생부종합 (일반)</option>
-                    <option value="학생부교과">학생부교과</option>
-                    <option value="논술전형">논술전형</option>
-                    <option value="기타 특별전형">기타 특별전형</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label class="block text-xs font-semibold text-slate-700 mb-1.5">작성 상담사 / 입력자 <span class="text-rose-500">*</span></label>
-                  <input type="text" id="sushi-author" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none">
-                </div>
-              </div>
-
-              <div class="flex items-center justify-end pt-3">
-                <button type="submit" id="sushi-submit-btn" class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl shadow-md shadow-blue-500/20 transition-all active:scale-98">
-                  <i data-lucide="plus-circle" class="w-4 h-4"></i>
-                  <span>수시 합격 데이터 저장하기</span>
-                </button>
-              </div>
-            </form>
-          </div>
-
-          <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-            <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
-                  <span>누적 수시 합격자 등록 내역</span>
-                  <span id="sushi-count-badge" class="text-xs bg-slate-100 text-slate-700 font-semibold px-2.5 py-0.5 rounded-full">0건</span>
-                </h3>
-              </div>
-              <div class="flex items-center gap-2">
-                <input type="text" id="sushi-search-input" oninput="renderSushiTable()" placeholder="학교명, 대학 또는 학과 검색..." class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 w-48">
-              </div>
-            </div>
-
-            <div class="overflow-x-auto">
-              <table class="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200/80">
-                    <th class="py-3 px-4">입력일시</th>
-                    <th class="py-3 px-4">연도</th>
-                    <th class="py-3 px-4">학교명</th>
-                    <th class="py-3 px-4">등수</th>
-                    <th class="py-3 px-4">합격 대학/학과</th>
-                    <th class="py-3 px-4">전형명</th>
-                    <th class="py-3 px-4">내신</th>
-                    <th class="py-3 px-4">입력자</th>
-                    <th class="py-3 px-4 text-center">관리</th>
-                  </tr>
-                </thead>
-                <tbody id="sushi-table-body" class="divide-y divide-slate-100 font-medium"></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <!-- ============================================================= -->
-        <!-- [입력 탭 3] 특별 프로그램 입력 (수정된 명칭 반영) -->
-        <!-- ============================================================= -->
-        <section id="tab-programs" class="tab-content hidden space-y-6">
-          <div class="bg-white rounded-2xl p-6 md:p-8 border border-slate-200/80 shadow-sm">
-            <div class="flex items-center justify-between border-b border-slate-100 pb-4 mb-6">
-              <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                  <i data-lucide="sparkles" class="w-5 h-5"></i>
-                </div>
-                <div>
-                  <h3 class="text-lg font-bold text-slate-900">특별 프로그램 입력</h3>
-                  <p class="text-xs text-slate-500">인근 고교의 특색 교육활동, 캠프, 심화 동아리 정보를 '특별프로그램_입력' 시트에 기록합니다.</p>
-                </div>
-              </div>
-              <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">Add / Edit 권한</span>
-            </div>
-
-            <form id="program-form" onsubmit="handleProgramSubmit(event)" class="space-y-5">
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label class="block text-xs font-semibold text-slate-700 mb-1.5">운영 연도 <span class="text-rose-500">*</span></label>
-                  <select id="prog-year" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-none">
-                    <option value="2026">2026학년도</option>
-                    <option value="2025">2025학년도</option>
-                    <option value="2024">2024학년도</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label class="block text-xs font-semibold text-slate-700 mb-1.5">고등학교명 <span class="text-rose-500">*</span></label>
-                  <input type="text" id="prog-school" list="school-datalist-prog" placeholder="예: A고등학교" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-none">
-                  <datalist id="school-datalist-prog"></datalist>
-                </div>
-
-                <div>
-                  <label class="block text-xs font-semibold text-slate-700 mb-1.5">작성 상담사 / 입력자 <span class="text-rose-500">*</span></label>
-                  <input type="text" id="prog-author" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-none">
-                </div>
-
-                <div class="sm:col-span-3">
-                  <label class="block text-xs font-semibold text-slate-700 mb-1.5">특별 프로그램 명칭 <span class="text-rose-500">*</span></label>
-                  <input type="text" id="prog-title" placeholder="예: 의생명 융합 캠프, 수리과학 탐구의 날" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-none">
-                </div>
-
-                <div class="sm:col-span-3">
-                  <label class="block text-xs font-semibold text-slate-700 mb-1.5">프로그램 주요 내용 및 생기부(세특) 연계 포인트 <span class="text-rose-500">*</span></label>
-                  <textarea id="prog-desc" rows="3" placeholder="생기부 세특용 심화 실험 진행, 소논문 형태의 탐구 보고서 제출" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-none"></textarea>
-                </div>
-              </div>
-
-              <div class="flex items-center justify-end pt-3">
-                <button type="submit" id="prog-submit-btn" class="inline-flex items-center gap-2 px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-xl shadow-md shadow-amber-500/20 transition-all active:scale-98">
-                  <i data-lucide="plus-circle" class="w-4 h-4"></i>
-                  <span>특별 프로그램 저장하기</span>
-                </button>
-              </div>
-            </form>
-          </div>
-
-          <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-            <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
-                  <span>등록된 특별 프로그램 목록</span>
-                  <span id="prog-count-badge" class="text-xs bg-slate-100 text-slate-700 font-semibold px-2.5 py-0.5 rounded-full">0건</span>
-                </h3>
-              </div>
-              <div class="flex items-center gap-2">
-                <input type="text" id="prog-search-input" oninput="renderProgTable()" placeholder="학교명 또는 프로그램 검색..." class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-500 w-48">
-              </div>
-            </div>
-
-            <div class="overflow-x-auto">
-              <table class="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200/80">
-                    <th class="py-3 px-4">입력일시</th>
-                    <th class="py-3 px-4">연도</th>
-                    <th class="py-3 px-4">학교명</th>
-                    <th class="py-3 px-4">프로그램 명칭</th>
-                    <th class="py-3 px-4">주요 내용 및 특징</th>
-                    <th class="py-3 px-4">입력자</th>
-                    <th class="py-3 px-4 text-center">관리</th>
-                  </tr>
-                </thead>
-                <tbody id="prog-table-body" class="divide-y divide-slate-100 font-medium"></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <!-- ============================================================= -->
-        <!-- [보기 탭] 학교별 정보 대시보드 (수정된 명칭 반영) -->
-        <!-- ============================================================= -->
-        <section id="tab-dashboard" class="tab-content hidden space-y-6">
-
-          <!-- 상단 요약 위젯 -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
-              <div>
-                <span class="text-xs font-semibold text-slate-500">인근 등록 학교</span>
-                <div id="stat-total-schools" class="text-2xl font-extrabold text-slate-900 mt-1">0개교</div>
-              </div>
-              <div class="w-12 h-12 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center">
-                <i data-lucide="school" class="w-6 h-6"></i>
-              </div>
-            </div>
-
-            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
-              <div>
-                <span class="text-xs font-semibold text-slate-500">수시 합격 데이터</span>
-                <div id="stat-total-sushi" class="text-2xl font-extrabold text-slate-900 mt-1">0건</div>
-              </div>
-              <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                <i data-lucide="check-circle" class="w-6 h-6"></i>
-              </div>
-            </div>
-
-            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
-              <div>
-                <span class="text-xs font-semibold text-slate-500">등록 특별 프로그램</span>
-                <div id="stat-total-progs" class="text-2xl font-extrabold text-slate-900 mt-1">0건</div>
-              </div>
-              <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                <i data-lucide="sparkles" class="w-6 h-6"></i>
-              </div>
-            </div>
-
-            <div class="bg-gradient-to-br from-indigo-900 to-slate-900 p-5 rounded-2xl text-white shadow-xs flex flex-col justify-between">
-              <div class="flex items-center justify-between text-xs text-indigo-200">
-                <span class="font-medium">상담 전용 보안 뷰</span>
-                <span class="text-[10px] bg-indigo-800/80 px-2 py-0.5 rounded-full">인증 완료</span>
-              </div>
-              <div class="mt-2 text-xs text-slate-300 leading-snug">
-                '대시보드_집계용' 시트 기반 학교별 실시간 합격 및 특색활동 종합 조회
-              </div>
-            </div>
-          </div>
-
-          <!-- 검색 및 필터 컨트롤 바 -->
-          <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div class="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-              <div class="flex items-center gap-1.5 text-xs font-medium text-slate-600">
-                <span>연도:</span>
-                <select id="filter-year" onchange="renderDashboard()" class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="ALL">전체 연도</option>
-                  <option value="2026" selected>2026학년도</option>
-                  <option value="2025">2025학년도</option>
-                  <option value="2024">2024학년도</option>
-                </select>
-              </div>
-
-              <div class="relative flex-1 sm:w-64">
-                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
-                <input type="text" id="filter-keyword" oninput="renderDashboard()" placeholder="학교명 검색 (예: A고등학교)..." class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-              </div>
-            </div>
-
-            <div class="flex items-center bg-slate-100 p-1 rounded-xl self-end sm:self-auto">
-              <button id="view-mode-deck" onclick="setViewMode('deck')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-white text-slate-900 shadow-xs">
-                <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
-                <span>카드 덱 뷰</span>
-              </button>
-              <button id="view-mode-table" onclick="setViewMode('table')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-500 hover:text-slate-800">
-                <i data-lucide="table" class="w-3.5 h-3.5"></i>
-                <span>테이블 뷰</span>
-              </button>
-            </div>
-          </div>
-
-          <div id="deck-view-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"></div>
-
-          <div id="table-view-container" class="hidden bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-            <div class="overflow-x-auto">
-              <table class="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
-                    <th class="py-3.5 px-5">연도</th>
-                    <th class="py-3.5 px-5">학교명</th>
-                    <th class="py-3.5 px-5">전교생 수</th>
-                    <th class="py-3.5 px-5">수집 현황(달성률)</th>
-                    <th class="py-3.5 px-5">전교 1~10등 수시 합격 요약</th>
-                    <th class="py-3.5 px-5">특별 프로그램</th>
-                    <th class="py-3.5 px-5 text-center">상세 상담</th>
-                  </tr>
-                </thead>
-                <tbody id="dashboard-table-body" class="divide-y divide-slate-100 font-medium"></tbody>
-              </table>
-            </div>
-          </div>
-
-        </section>
-
-      </div>
     </main>
 
-    <!-- =============================================================== -->
-    <!-- 4. 모바일 하단 네비게이션 -->
-    <!-- =============================================================== -->
-    <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 py-2 px-3 flex justify-around items-center z-40 shadow-lg">
-      <button onclick="switchTab('tab-school-info')" id="mob-tab-school-info" class="flex flex-col items-center gap-1 text-slate-400">
-        <i data-lucide="school" class="w-5 h-5"></i>
-        <span class="text-[9px] font-semibold">학교정보</span>
-      </button>
-      <button onclick="switchTab('tab-sushi')" id="mob-tab-sushi" class="flex flex-col items-center gap-1 text-slate-400">
-        <i data-lucide="file-plus" class="w-5 h-5"></i>
-        <span class="text-[9px] font-semibold">수시합격</span>
-      </button>
-      <button onclick="switchTab('tab-programs')" id="mob-tab-programs" class="flex flex-col items-center gap-1 text-slate-400">
-        <i data-lucide="sparkles" class="w-5 h-5"></i>
-        <span class="text-[9px] font-semibold">프로그램</span>
-      </button>
-      <button onclick="switchTab('tab-dashboard')" id="mob-tab-dashboard" class="flex flex-col items-center gap-1 text-slate-400">
-        <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
-        <span class="text-[9px] font-semibold">대시보드</span>
-      </button>
-    </nav>
+    <!-- 푸터 -->
+    <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-400">
+      고교 수시 상담센터 사내 데이터베이스 시스템 (Reboot v1) &copy; 2026
+    </footer>
 
   </div>
 
-  <!-- ================================================================= -->
-  <!-- 5. 모달: 학교별 상담 상세 페이지 (Detail View Modal) -->
-  <!-- ================================================================= -->
-  <div id="detail-modal" onclick="if(event.target === this) closeDetailModal()" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-200">
-    <div class="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden transform scale-95 transition-transform duration-200" id="detail-modal-box">
-      <div class="bg-slate-900 text-white p-6 flex items-start justify-between">
-        <div class="flex items-center space-x-4">
-          <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
-            <i data-lucide="school" class="w-8 h-8"></i>
-          </div>
-          <div>
-            <div class="flex items-center gap-2">
-              <h2 id="modal-school-name" class="text-2xl font-bold">학교명</h2>
-              <span id="modal-school-year" class="text-xs bg-blue-500/30 text-blue-300 font-semibold px-2.5 py-0.5 rounded-full border border-blue-400/30">2026학년도</span>
-            </div>
-            <p id="modal-school-code" class="text-xs text-slate-400 mt-1 font-mono">학교 고유번호: 2026-A고</p>
-          </div>
-        </div>
-        <button onclick="closeDetailModal()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 flex items-center justify-center transition-colors">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
-      </div>
+  <!-- 토스트 알림 컨테이너 -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 hidden px-4 py-3 rounded-2xl shadow-xl text-xs font-semibold text-white flex items-center gap-2 transition-all"></div>
 
-      <div class="p-6 md:p-8 overflow-y-auto space-y-8 flex-1">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
-            <span class="text-xs font-semibold text-slate-500">전교 학생수</span>
-            <div id="modal-school-students" class="text-xl font-bold text-slate-900 mt-1">250명</div>
-            <span class="text-[11px] text-slate-400">학기 기준 정원</span>
-          </div>
-
-          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
-            <span class="text-xs font-semibold text-slate-500">데이터 수집 현황 (달성률)</span>
-            <div class="flex items-baseline justify-between mt-1">
-              <span id="modal-school-progress-text" class="text-xl font-bold text-blue-600">2 / 10명</span>
-              <span id="modal-school-percent" class="text-xs font-bold text-blue-700">20%</span>
-            </div>
-            <div class="w-full bg-slate-200 h-2 rounded-full mt-2 overflow-hidden">
-              <div id="modal-school-progress-bar" class="bg-blue-600 h-full rounded-full transition-all duration-500" style="width: 20%"></div>
-            </div>
-          </div>
-
-          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 flex flex-col justify-between">
-            <span class="text-xs font-semibold text-slate-500">교과 편성표</span>
-            <div id="modal-school-curriculum-container" class="mt-2">
-              <a id="modal-school-curriculum-link" href="#" target="_blank" class="inline-flex items-center gap-1.5 text-xs font-semibold text-cyan-700 hover:text-cyan-900 bg-cyan-50 border border-cyan-200 px-3 py-1.5 rounded-lg transition-colors">
-                <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
-                <span>편성표 문서/링크 열기</span>
-              </a>
-              <span id="modal-curriculum-none" class="text-xs text-slate-400 hidden">등록된 링크 없음</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="space-y-3">
-          <div class="flex items-center justify-between border-b border-slate-200 pb-2">
-            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-              <i data-lucide="award" class="w-5 h-5 text-blue-600"></i>
-              <span>전교 1~10등 수시 합격 종합</span>
-            </h3>
-            <span class="text-xs text-slate-500">최상위권 수시 결과</span>
-          </div>
-          <div id="modal-sushi-list" class="space-y-2.5"></div>
-        </div>
-
-        <div class="space-y-3">
-          <div class="flex items-center justify-between border-b border-slate-200 pb-2">
-            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-              <i data-lucide="sparkles" class="w-5 h-5 text-amber-500"></i>
-              <span>진행 중인 특별 프로그램 (세특 및 비교과)</span>
-            </h3>
-            <span class="text-xs text-slate-500">학교별 특화 비교과</span>
-          </div>
-          <div id="modal-program-list" class="space-y-3"></div>
-        </div>
-      </div>
-
-      <div class="bg-slate-50 border-t border-slate-200 px-6 py-4 flex justify-between items-center">
-        <span class="text-xs text-slate-500 font-medium">※ 본 자료는 학원 상담 전용 비공개 데이터입니다.</span>
-        <button onclick="closeDetailModal()" class="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold transition-colors">창 닫기</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ================================================================= -->
-  <!-- 6. [신규 모달] 파일 중복 확인 및 삭제 컨펌 모달 -->
-  <!-- ================================================================= -->
-  <div id="file-duplicate-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-200">
-    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
-      <div class="flex items-center space-x-3 text-amber-600">
-        <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
-          <i data-lucide="alert-triangle" class="w-5 h-5"></i>
-        </div>
-        <h3 class="font-bold text-slate-900 text-base">구글 드라이브 파일 중복 확인</h3>
-      </div>
-      
-      <p class="text-xs text-slate-600 leading-relaxed">
-        구글 드라이브 폴더에 동일한 학교 고유번호 파일(<b id="dup-filename-text" class="text-cyan-700 font-mono"></b>)이 이미 존재합니다.<br><br>
-        기존 파일을 삭제하고 새로운 파일로 업로드하시겠습니까?
-      </p>
-
-      <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-        <button type="button" onclick="cancelFileDuplicateUpload()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors">아니오 (취소)</button>
-        <button type="button" onclick="confirmFileDuplicateUpload()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition-colors">삭제 후 업로드</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ================================================================= -->
-  <!-- 7. [신규 모달] 학교 정보 중복 확인 모달 (수정 / 아니오) -->
-  <!-- ================================================================= -->
-  <div id="school-duplicate-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-200">
-    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
-      <div class="flex items-center space-x-3 text-blue-600">
-        <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
-          <i data-lucide="help-circle" class="w-5 h-5"></i>
-        </div>
-        <h3 class="font-bold text-slate-900 text-base">학교 정보 중복 확인</h3>
-      </div>
-      
-      <div class="text-xs text-slate-600 space-y-2 leading-relaxed">
-        <p>
-          이미 등록된 학교(<b id="dup-school-code-text" class="text-blue-700 font-mono"></b>) 정보가 존재합니다.
-        </p>
-        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-[11px] text-slate-500">
-          💡 <b>[수정]</b> 선택 시 데이터베이스에 기존 로그는 안전하게 보존되며, 입력하신 내용이 <b>새로운 로그로 누적 반영</b>되어 최신 상태로 관리됩니다.
-        </div>
-        <p class="font-semibold text-slate-800">최근 내용으로 업데이트(수정)하시겠습니까?</p>
-      </div>
-
-      <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-        <button type="button" onclick="cancelSchoolDuplicateSubmit()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors">아니오</button>
-        <button type="button" onclick="confirmSchoolDuplicateSubmit()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors">수정</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 학교 기본 정보 수정 모달 -->
-  <div id="edit-school-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-200">
-    <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4">
-      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-        <h3 class="font-bold text-slate-900 text-base">학교 기본 정보 수정</h3>
-        <button onclick="closeEditSchoolModal()" class="text-slate-400 hover:text-slate-600">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
-      </div>
-      <form id="edit-school-form" onsubmit="handleSchoolUpdate(event)" class="space-y-4">
-        <input type="hidden" id="edit-school-id">
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">연도</label>
-            <input type="text" id="edit-school-year" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">학교명</label>
-            <input type="text" id="edit-school-name" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">전교 학생수</label>
-            <input type="text" id="edit-school-students" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">데이터 수집 현황</label>
-            <input type="text" id="edit-school-progress" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs">
-          </div>
-          <div class="col-span-2">
-            <label class="block text-xs font-semibold text-slate-700 mb-1">교과 편성표 공유 링크</label>
-            <input type="text" id="edit-school-curriculum" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs">
-          </div>
-        </div>
-        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
-          <button type="button" onclick="closeEditSchoolModal()" class="px-4 py-2 bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg">취소</button>
-          <button type="submit" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-semibold rounded-lg">수정 완료</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- 수시 합격 수정 모달 -->
-  <div id="edit-sushi-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-200">
-    <div class="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl">
-      <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-        <h3 class="font-bold text-slate-900 text-base">수시 합격 데이터 수정</h3>
-        <button onclick="closeEditSushiModal()" class="text-slate-400 hover:text-slate-600">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
-      </div>
-      <form id="edit-sushi-form" onsubmit="handleSushiUpdate(event)" class="space-y-4">
-        <input type="hidden" id="edit-sushi-id">
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">학년도</label>
-            <input type="number" id="edit-sushi-year" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">학교명</label>
-            <input type="text" id="edit-sushi-school" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">전교 등수</label>
-            <input type="text" id="edit-sushi-rank" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">내신 등급</label>
-            <input type="number" step="0.01" id="edit-sushi-grade" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">합격 대학</label>
-            <input type="text" id="edit-sushi-univ" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">합격 학과</label>
-            <input type="text" id="edit-sushi-dept" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">전형명</label>
-            <input type="text" id="edit-sushi-type" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">입력자</label>
-            <input type="text" id="edit-sushi-author" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs">
-          </div>
-        </div>
-        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
-          <button type="button" onclick="closeEditSushiModal()" class="px-4 py-2 bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg">취소</button>
-          <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg">수정 완료</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- 특별 프로그램 수정 모달 -->
-  <div id="edit-prog-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-200">
-    <div class="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl">
-      <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-        <h3 class="font-bold text-slate-900 text-base">특별 프로그램 수정</h3>
-        <button onclick="closeEditProgModal()" class="text-slate-400 hover:text-slate-600">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
-      </div>
-      <form id="edit-prog-form" onsubmit="handleProgUpdate(event)" class="space-y-4">
-        <input type="hidden" id="edit-prog-id">
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">운영 연도</label>
-            <input type="number" id="edit-prog-year" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">학교명</label>
-            <input type="text" id="edit-prog-school" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs">
-          </div>
-          <div class="col-span-2">
-            <label class="block text-xs font-semibold text-slate-700 mb-1">프로그램 명칭</label>
-            <input type="text" id="edit-prog-title" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs">
-          </div>
-          <div class="col-span-2">
-            <label class="block text-xs font-semibold text-slate-700 mb-1">프로그램 주요 내용 및 특징</label>
-            <textarea id="edit-prog-desc" rows="3" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs"></textarea>
-          </div>
-          <div class="col-span-2">
-            <label class="block text-xs font-semibold text-slate-700 mb-1">입력자</label>
-            <input type="text" id="edit-prog-author" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs">
-          </div>
-        </div>
-        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
-          <button type="button" onclick="closeEditProgModal()" class="px-4 py-2 bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg">취소</button>
-          <button type="submit" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg">수정 완료</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- 관리자 전용 연동 설정 모달 -->
-  <div id="settings-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-200">
-    <div class="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-5">
-      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-        <div class="flex items-center space-x-2.5">
-          <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-            <i data-lucide="settings" class="w-4 h-4"></i>
-          </div>
-          <h3 class="font-bold text-slate-900 text-base">구글 스프레드시트 연동 설정 (관리자 전용)</h3>
-        </div>
-        <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
-      </div>
-
-      <div class="text-xs text-slate-600 space-y-3 leading-relaxed">
-        <p>본 설정은 <b>'관리자'</b> 권한을 보유한 사용자만 수정할 수 있습니다. Google Apps Script Webhook URL을 설정하여 실시간 시트 및 드라이브 폴더 쓰기 연동을 구성하세요.</p>
-        
-        <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
-          <div class="font-bold text-slate-800">연동 절차 안내:</div>
-          <ol class="list-decimal list-inside space-y-1 text-slate-600">
-            <li>구글 시트 상단 메뉴 <b>[확장 프로그램] → [Apps Script]</b> 클릭</li>
-            <li>프로젝트 루트의 <code>google_apps_script.js</code> 코드를 복사하여 붙여넣기</li>
-            <li>우측 상단 <b>[배포] → [새 배포] → 유형: [웹 앱]</b> (액세스 권한: 모든 사용자) 배포 후 URL 입력</li>
-          </ol>
-        </div>
-
-        <div>
-          <label class="block font-semibold text-slate-800 mb-1">Google Apps Script 웹 앱 URL</label>
-          <input type="url" id="settings-gas-url" placeholder="https://script.google.com/macros/s/.../exec" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
-        </div>
-      </div>
-
-      <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-        <button type="button" onclick="closeSettingsModal()" class="px-4 py-2 bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg">닫기</button>
-        <button type="button" onclick="saveSettings()" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg">설정 저장</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
-
-  <!-- 프론트엔드 비즈니스 로직 스크립트 -->
+  <!-- 앱 스크립트 연결 -->
   <script src="app.js"></script>
 </body>
 </html>

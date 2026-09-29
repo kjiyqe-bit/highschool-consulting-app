@@ -1,2 +1,1 @@
-# Python 의존성 파일 (Python Standard Library 내장 모듈 사용)
-# Vercel Serverless Function 배포 규격 준수
+# Vercel Serverless Python 환경 의존성 (표준 라이브러리 기반 초경량 구동)
