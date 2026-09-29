@@ -212,8 +212,13 @@ def save_local_data(data):
 # ===========================================================================
 # 5. Google Apps Script 웹훅 실시간 동기화
 # ===========================================================================
-def sync_to_google_apps_script(action, table, payload):
-    """Google Apps Script 웹앱으로 POST 요청을 전송하여 구글 시트 및 드라이브에 실시간 반영"""
+def sync_to_google_apps_script(action, table, payload, timeout=15):
+    """
+    Google Apps Script 웹앱으로 POST 요청을 전송하여 구글 시트 및 드라이브에 실시간 반영
+    - action: GAS가 인식하는 값 사용 ("add", "update", "delete", "upload_file", "check_file")
+    - 파일 업로드(upload_file)는 timeout을 25초로 늘려서 호출해야 함
+    - 실패해도 예외를 던지지 않고 None 반환 (로컬 저장은 보장)
+    """
     cfg = load_config()
     gas_url = cfg.get("apps_script_url", "").strip()
     if not gas_url:
@@ -221,10 +226,11 @@ def sync_to_google_apps_script(action, table, payload):
         return None
 
     try:
+        # GAS는 postData.contents를 파싱하며 action, table, data 키를 읽음
         body = json.dumps({
             "action": action,
             "table": table,
-            "payload": payload,
+            "data": payload,                                # GAS에서 data로 읽음
             "timestamp": datetime.datetime.now().isoformat()
         }).encode("utf-8")
 
@@ -234,15 +240,15 @@ def sync_to_google_apps_script(action, table, payload):
             headers={"Content-Type": "application/json"},
             method="POST"
         )
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             res_text = resp.read().decode("utf-8")
-            print(f"[구글 시트 연동 성공] {action} {table}: {res_text}")
+            print(f"[구글 시트 연동 성공] {action}/{table}: {res_text[:200]}")
             try:
                 return json.loads(res_text)
             except Exception:
                 return res_text
     except Exception as e:
-        print(f"[구글 시트 웹훅 전송 실패] {e}")
+        print(f"[구글 시트 웹훅 전송 실패] action={action}, table={table}, err={e}")
         return None
 
 
@@ -381,6 +387,7 @@ class handler(http.server.BaseHTTPRequestHandler):
 
         # ===================================================================
         # 2. 파일 중복 검사 API (/api/check_file)
+        # 속도를 위해 로컬 /tmp 확인만 수행 (GAS 호출 없음 → 빠른 응답)
         # ===================================================================
         if route == "check_file":
             school_code = query.get("school_code", [""])[0].strip()
@@ -398,6 +405,7 @@ class handler(http.server.BaseHTTPRequestHandler):
             exists_local = False
             file_url = ""
 
+            # 로컬 /tmp 폴더에 같은 파일명이 있는지만 확인 (GAS 호출 없이 빠르게)
             if target_filename:
                 local_path = os.path.join(UPLOADS_DIR, target_filename)
                 exists_local = os.path.exists(local_path)
@@ -405,23 +413,10 @@ class handler(http.server.BaseHTTPRequestHandler):
                     host = self.headers.get("Host", "localhost")
                     file_url = f"https://{host}/uploads/{urllib.parse.quote(target_filename)}"
 
-            # 구글 드라이브 폴더 내 중복 체크 (Apps Script 웹훅)
-            exists_drive = False
-            gas_res = sync_to_google_apps_script("check_file", "schools", {
-                "file_name": target_filename,
-                "folder_id": GOOGLE_DRIVE_FOLDER_ID
-            })
-            if gas_res and isinstance(gas_res, dict) and gas_res.get("exists"):
-                exists_drive = True
-                if gas_res.get("file_url"):
-                    file_url = gas_res["file_url"]
-
-            is_duplicate = exists_local or exists_drive
-
             self.send_json_response(200, {
                 "success": True,
-                "is_duplicate": is_duplicate,
-                "exists": is_duplicate,
+                "is_duplicate": exists_local,
+                "exists": exists_local,
                 "filename": target_filename,
                 "existing_url": file_url,
                 "google_drive_folder_url": GOOGLE_DRIVE_FOLDER_URL
@@ -585,7 +580,7 @@ class handler(http.server.BaseHTTPRequestHandler):
 
             target_filename = f"{school_code}{ext}" if school_code else f"curriculum_{uuid.uuid4().hex[:8]}{ext}"
 
-            # /tmp 디렉토리에 임시 파일 저장
+            # /tmp 디렉토리에 임시 파일 저장 (Vercel 서버리스 환경)
             local_filepath = os.path.join(UPLOADS_DIR, target_filename)
             file_bytes = base64.b64decode(file_base64)
             with open(local_filepath, "wb") as f:
@@ -593,23 +588,36 @@ class handler(http.server.BaseHTTPRequestHandler):
 
             host = self.headers.get("Host", "localhost")
             final_file_url = f"https://{host}/uploads/{urllib.parse.quote(target_filename)}"
+            drive_status = "pending"
 
             # Google Apps Script를 통해 구글 드라이브 폴더에 업로드
-            gas_res = sync_to_google_apps_script("upload_file", "schools", {
-                "file_name": target_filename,
-                "file_base64": file_base64,
-                "folder_id": GOOGLE_DRIVE_FOLDER_ID,
-                "overwrite": overwrite
-            })
+            # 타임아웃을 25초로 늘림 (파일 전송은 오래 걸릴 수 있음)
+            # GAS 업로드 실패해도 로컬 저장은 성공 → 전체 실패 처리하지 않음
+            try:
+                gas_res = sync_to_google_apps_script("upload_file", "schools", {
+                    "file_name": target_filename,
+                    "file_base64": file_base64,
+                    "folder_id": GOOGLE_DRIVE_FOLDER_ID,
+                    "overwrite": overwrite,
+                    "mime_type": "application/pdf" if ext.lower() == ".pdf" else "application/octet-stream"
+                }, timeout=25)
 
-            if gas_res and isinstance(gas_res, dict) and gas_res.get("file_url"):
-                final_file_url = gas_res["file_url"]
+                if gas_res and isinstance(gas_res, dict) and gas_res.get("file_url"):
+                    final_file_url = gas_res["file_url"]
+                    drive_status = "success"
+                else:
+                    drive_status = "fallback_local"
+                    print(f"[드라이브 업로드 실패 - 로컬 저장으로 대체] {target_filename}")
+            except Exception as e:
+                drive_status = "error"
+                print(f"[드라이브 업로드 오류] {e}")
 
             self.send_json_response(200, {
                 "success": True,
                 "url": final_file_url,
                 "filename": target_filename,
-                "is_drive_uploaded": bool(gas_res and isinstance(gas_res, dict) and gas_res.get("file_url")),
+                "drive_status": drive_status,
+                "is_drive_uploaded": drive_status == "success",
                 "google_drive_folder_url": GOOGLE_DRIVE_FOLDER_URL
             })
             return
@@ -658,8 +666,8 @@ class handler(http.server.BaseHTTPRequestHandler):
             data["schools"] = schools
             save_local_data(data)
 
-            # 구글 시트에 실시간 반영
-            sync_to_google_apps_script("insert", "schools", new_row)
+            # 구글 시트에 실시간 반영 (GAS action 이름: "add")
+            sync_to_google_apps_script("add", "schools", new_row)
 
             self.send_json_response(201, {"success": True, "item": new_row})
             return
@@ -697,7 +705,7 @@ class handler(http.server.BaseHTTPRequestHandler):
             data["sushi"].insert(0, new_row)
             save_local_data(data)
 
-            sync_to_google_apps_script("insert", "sushi", new_row)
+            sync_to_google_apps_script("add", "sushi", new_row)
             self.send_json_response(201, {"success": True, "item": new_row})
             return
 
@@ -728,7 +736,7 @@ class handler(http.server.BaseHTTPRequestHandler):
             data["programs"].insert(0, new_row)
             save_local_data(data)
 
-            sync_to_google_apps_script("insert", "programs", new_row)
+            sync_to_google_apps_script("add", "programs", new_row)
             self.send_json_response(201, {"success": True, "item": new_row})
             return
 

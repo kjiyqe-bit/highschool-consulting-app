@@ -513,7 +513,14 @@ async function uploadFileToServer(file, schoolCode, overwrite = false) {
         });
         const result = await res.json();
         if (result.success) {
-          resolve(result.url); // 업로드된 최종 링크 반환
+          // drive_status: 'success' = 드라이브 정상 업로드
+          //               'fallback_local' = 드라이브 실패, 로컬 저장됨
+          //               'error' = 드라이브 오류, 로컬만 저장됨
+          resolve({
+            url: result.url,
+            driveStatus: result.drive_status || 'unknown',
+            isDriveUploaded: result.is_drive_uploaded === true
+          });
         } else {
           reject(new Error(result.error || '파일 업로드 실패'));
         }
@@ -568,8 +575,16 @@ async function handleSchoolSubmit(event) {
       btn.innerHTML = `<span class="animate-pulse">드라이브 폴더 파일 업로드 중...</span>`;
       document.getElementById('upload-status-badge').textContent = '드라이브 폴더 저장 중...';
 
-      curriculumLink = await uploadFileToServer(state.selectedFile, schoolCode, overwriteFile);
-      document.getElementById('upload-status-badge').textContent = '업로드 완료';
+      const uploadResult = await uploadFileToServer(state.selectedFile, schoolCode, overwriteFile);
+      curriculumLink = uploadResult.url;
+
+      // 드라이브 업로드 성공 여부에 따라 상태 배지 업데이트
+      if (uploadResult.isDriveUploaded) {
+        document.getElementById('upload-status-badge').textContent = '드라이브 업로드 완료';
+      } else {
+        document.getElementById('upload-status-badge').textContent = '업로드 완료 (드라이브 연동 확인 필요)';
+        console.warn('[파일 업로드] 드라이브 연동 실패, 로컬 저장 URL 사용:', curriculumLink);
+      }
 
     } else if (state.curriculumMode === 'url') {
       const urlVal = document.getElementById('school-curriculum-url').value.trim();
