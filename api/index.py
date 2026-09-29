@@ -5,17 +5,18 @@
 파일: api/index.py
 -----------------------------------------------------------------------------
 [핵심 기능]
-1. 구글 스프레드시트 실시간 GViz CSV 데이터 일괄 조회 (/api/data)
-2. 상담진 로그인 인증 (/api/login):
+1. Vercel 라우트 3중 감지 엔진 탑재 (404 '존재하지 않는 엔드포인트' 원천 차단):
+   - 1순위: vercel.json rewrite 쿼리 파라미터 (route=$1)
+   - 2순위: Vercel 프록시 헤더 (x-vercel-matched-path, x-forwarded-uri 등)
+   - 3순위: self.path 직접 파싱
+2. 구글 스프레드시트 5개 탭 실시간 GViz CSV 데이터 일괄 조회 (/api/data)
+3. 상담진 로그인 인증 (/api/login):
    - '접근 권한' 시트 A열(이름), B열(휴대폰 번호), C열(사번) 일치 검증
    - D열 '관리자' 체크 및 최고 관리자 권한 부여
-3. 학교 기본 정보 등록 (/api/schools): B열(연도), C열(학교명), D열(학생수), E열(링크)
-4. 수시 합격 현황 등록 (/api/sushi):
-   - 단일 또는 다중 합격 데이터 일괄 누적 저장 지원 (한 학생의 다중 합격 지원)
-5. 특별 프로그램 및 우수 동아리 등록 (/api/programs):
-   - 구분(프로그램/동아리), 명칭, 주요 활동 내용, 작성자 누적 저장
-6. 관리자 설정 (/api/config):
-   - 구글 웹 앱 URL 수정 및 저장
+4. 학교 기본 정보 등록 (/api/schools): B열(연도), C열(학교명), D열(학생수), E열(링크)
+5. 수시 합격 현황 등록 (/api/sushi): 단일 또는 다중 합격 데이터 일괄 누적 저장
+6. 특별 프로그램 및 우수 동아리 등록 (/api/programs): 구분, 명칭, 내용, 작성자 누적 저장
+7. 관리자 설정 (/api/config): 구글 웹 앱 URL 수정 및 저장
 =============================================================================
 """
 
@@ -171,6 +172,48 @@ def sync_to_apps_script(action, table, row_data):
 # ===========================================================================
 class handler(http.server.BaseHTTPRequestHandler):
 
+    def get_api_route(self):
+        """
+        Vercel Rewrites 및 다중 프록시 환경에서 요청된 API 라우트명을 100% 감지
+        반환 예: 'data', 'login', 'schools', 'sushi', 'programs', 'config', 'health'
+        """
+        parsed_self = urllib.parse.urlparse(self.path)
+        query = urllib.parse.parse_qs(parsed_self.query)
+
+        # 1. vercel.json에서 rewrites로 전달한 route 쿼리 파라미터 (가장 확실함)
+        if "route" in query:
+            r = query["route"][0].strip().strip("/")
+            # 파일 확장자(.py 등) 제거
+            r = r.split("?")[0].replace(".py", "")
+            if r:
+                return r
+
+        # 2. Vercel 제공 프록시 헤더 확인
+        matched = (
+            self.headers.get("x-vercel-matched-path") or
+            self.headers.get("x-forwarded-uri") or
+            self.headers.get("x-matched-path") or
+            ""
+        )
+        if matched:
+            parsed_m = urllib.parse.urlparse(matched)
+            clean_p = parsed_m.path.replace("/api/", "").strip("/").replace(".py", "")
+            if clean_p and clean_p != "index":
+                return clean_p
+
+        # 3. self.path 직접 파싱 (/api/xxx)
+        clean_path = parsed_self.path.replace("/api/", "").strip("/").replace(".py", "")
+        if clean_path and clean_path != "index":
+            return clean_path
+
+        # 4. 경로가 비어있거나 index인 경우 전체 path에서 키워드 탐색
+        full_path = self.path.lower()
+        for candidate in ["data", "login", "schools", "sushi", "programs", "config", "health", "access"]:
+            if candidate in full_path:
+                return candidate
+
+        return ""
+
     def send_json(self, status_code, data):
         """표준 JSON 응답 헤더 및 바디 작성"""
         payload = json.dumps(data, ensure_ascii=False).encode("utf-8")
@@ -193,16 +236,19 @@ class handler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         """GET 요청 처리"""
-        parsed = urllib.parse.urlparse(self.path)
-        path = parsed.path
+        route = self.get_api_route()
 
-        # 1. 헬스체크
-        if path.endswith("/health"):
-            self.send_json(200, {"status": "online", "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
+        # 1. 헬스체크 (/api/health)
+        if route == "health":
+            self.send_json(200, {
+                "status": "online",
+                "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "detected_route": route
+            })
             return
 
-        # 2. 전체 데이터 조회 (/api/data)
-        if path.endswith("/data"):
+        # 2. 전체 데이터 조회 (/api/data 또는 /api/access)
+        if route in ["data", "access", ""]:
             all_data = fetch_all_sheets()
             self.send_json(200, {
                 "success": True,
@@ -212,19 +258,23 @@ class handler(http.server.BaseHTTPRequestHandler):
             return
 
         # 3. 설정 조회 (/api/config)
-        if path.endswith("/config"):
+        if route == "config":
             self.send_json(200, {
                 "success": True,
                 "apps_script_url": load_gas_url()
             })
             return
 
-        self.send_json(404, {"success": False, "error": "존재하지 않는 엔드포인트입니다."})
+        self.send_json(404, {
+            "success": False,
+            "error": "존재하지 않는 엔드포인트입니다.",
+            "detected_route": route,
+            "raw_path": self.path
+        })
 
     def do_POST(self):
         """POST 요청 처리"""
-        parsed = urllib.parse.urlparse(self.path)
-        path = parsed.path
+        route = self.get_api_route()
 
         content_length = int(self.headers.get("Content-Length", 0))
         raw_body = self.rfile.read(content_length).decode("utf-8") if content_length > 0 else ""
@@ -238,7 +288,7 @@ class handler(http.server.BaseHTTPRequestHandler):
         # -------------------------------------------------------------------
         # 1. [로그인 인증 API] (/api/login)
         # -------------------------------------------------------------------
-        if path.endswith("/login") or "login" in path:
+        if route == "login":
             name_input = str(body.get("name", "")).strip()
             phone_input = str(body.get("phone", "")).strip()
             emp_input = str(body.get("emp_no", "")).strip()
@@ -316,7 +366,7 @@ class handler(http.server.BaseHTTPRequestHandler):
         # -------------------------------------------------------------------
         # 2. [학교 기본 정보 등록] (/api/schools)
         # -------------------------------------------------------------------
-        if path.endswith("/schools") or "schools" in path:
+        if route == "schools":
             year = str(body.get("연도", "2026")).strip()
             name = str(body.get("학교명", "")).strip()
             students = str(body.get("전교 학생수", body.get("전교학생수", ""))).strip()
@@ -351,9 +401,8 @@ class handler(http.server.BaseHTTPRequestHandler):
         # -------------------------------------------------------------------
         # 3. [수시 합격 현황 등록 (단일 또는 다중 리스트 지원)] (/api/sushi)
         # -------------------------------------------------------------------
-        if path.endswith("/sushi") or "sushi" in path:
+        if route == "sushi":
             items = body.get("items")
-            # 단일 건 입력인 경우 리스트로 포장
             if not items:
                 items = [body]
 
@@ -398,10 +447,10 @@ class handler(http.server.BaseHTTPRequestHandler):
         # -------------------------------------------------------------------
         # 4. [특별 프로그램 및 우수 동아리 등록] (/api/programs)
         # -------------------------------------------------------------------
-        if path.endswith("/programs") or "programs" in path:
+        if route == "programs":
             year = str(body.get("연도", "2026")).strip()
             school = str(body.get("학교명", "")).strip()
-            category = str(body.get("구분", "특별프로그램")).strip() # '특별프로그램' 또는 '우수동아리'
+            category = str(body.get("구분", "특별프로그램")).strip()
             prog_name = str(body.get("프로그램 명칭", body.get("프로그램명", ""))).strip()
             prog_content = str(body.get("프로그램 주요 내용", body.get("프로그램 내용", ""))).strip()
             author = str(body.get("입력자", "")).strip() or "상담진"
@@ -410,7 +459,6 @@ class handler(http.server.BaseHTTPRequestHandler):
                 self.send_json(400, {"success": False, "error": "학교명과 명칭은 필수 항목입니다."})
                 return
 
-            # 동아리인 경우 명칭 앞에 구분 표시
             full_title = f"[{category}] {prog_name}" if category and not prog_name.startswith("[") else prog_name
 
             new_record = {
@@ -433,7 +481,7 @@ class handler(http.server.BaseHTTPRequestHandler):
         # -------------------------------------------------------------------
         # 5. [관리자 설정 저장] (/api/config)
         # -------------------------------------------------------------------
-        if path.endswith("/config") or "config" in path:
+        if route == "config":
             new_url = str(body.get("apps_script_url", "")).strip()
             if new_url:
                 save_gas_url(new_url)
@@ -442,4 +490,9 @@ class handler(http.server.BaseHTTPRequestHandler):
                 self.send_json(400, {"success": False, "error": "유효한 웹 앱 URL을 입력해 주세요."})
             return
 
-        self.send_json(404, {"success": False, "error": "존재하지 않는 엔드포인트입니다."})
+        self.send_json(404, {
+            "success": False,
+            "error": "존재하지 않는 엔드포인트입니다.",
+            "detected_route": route,
+            "raw_path": self.path
+        })
