@@ -222,6 +222,21 @@ class handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Access-Control-Max-Age", "86400")
         self.end_headers()
 
+    def send_file(self, file_path, content_type):
+        """정적 파일 (index.html, app.js 등) 서빙"""
+        try:
+            with open(file_path, "rb") as f:
+                content = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type", f"{content_type}; charset=utf-8")
+            self.send_header("Content-Length", str(len(content)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(content)
+            return True
+        except Exception:
+            return False
+
     def do_GET(self):
         """GET 요청 처리"""
         route = self.get_api_route()
@@ -236,7 +251,7 @@ class handler(http.server.BaseHTTPRequestHandler):
             return
 
         # 2. 전체 데이터 조회 (/api/data 또는 /api/access)
-        if route in ["data", "access", ""]:
+        if route in ["data", "access"]:
             try:
                 all_data = fetch_all_sheets()
                 self.send_json(200, {
@@ -258,6 +273,29 @@ class handler(http.server.BaseHTTPRequestHandler):
                 "apps_script_url": load_gas_url()
             })
             return
+
+        # 4. 정적 웹페이지 서빙 (루트 / 또는 index.html 접속 시 예쁜 HTML UI 표출)
+        clean_path = urllib.parse.urlparse(self.path).path.strip("/")
+        if not clean_path or clean_path in ["index.html", "index", "api", "api/"]:
+            candidates = [
+                os.path.join(PROJECT_ROOT, "index.html"),
+                os.path.join(PROJECT_ROOT, "static", "index.html"),
+                os.path.join(CURRENT_DIR, "index.html")
+            ]
+            for candidate in candidates:
+                if os.path.exists(candidate):
+                    if self.send_file(candidate, "text/html"):
+                        return
+
+        if clean_path in ["app.js", "static/app.js"]:
+            candidate = os.path.join(PROJECT_ROOT, "app.js")
+            if os.path.exists(candidate) and self.send_file(candidate, "text/javascript"):
+                return
+
+        if clean_path in ["style.css", "static/style.css"]:
+            candidate = os.path.join(PROJECT_ROOT, "style.css")
+            if os.path.exists(candidate) and self.send_file(candidate, "text/css"):
+                return
 
         self.send_json(404, {
             "success": False,
