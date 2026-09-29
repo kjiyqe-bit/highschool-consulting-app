@@ -456,7 +456,7 @@ class handler(http.server.BaseHTTPRequestHandler):
             timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             year = str(body.get("학년도", body.get("연도", "2026학년도"))).strip()
             name = str(body.get("학교명", "")).strip()
-            students = str(body.get("학생 수", body.get("학생수", body.get("전교 학생수", body.get("전교학생수", ""))))).strip()
+            students = str(body.get("학생 수", body.get("학생수", body.get("전교 학생수", body.get("전교학생수", body.get("studentCount", "")))))) .strip()
             school_type = str(body.get("학교 유형", body.get("학교유형", "일반고"))).strip()
             link = str(body.get("교과 편성표(링크)", body.get("교과편성표(링크)", body.get("링크", "")))).strip() or "링크입력예정"
 
@@ -474,10 +474,13 @@ class handler(http.server.BaseHTTPRequestHandler):
                 "학년도": year,
                 "학교명": name,
                 "학생 수": students,
+                "학생수": students,
+                "전교 학생수": students,
+                "전교학생수": students,
+                "studentCount": students,
                 "학교 유형": school_type,
                 "교과 편성표(링크)": link,
-                "링크": link,
-                "전교 학생수": students
+                "링크": link
             }
 
             gas_res = sync_to_apps_script("add", "schools", new_record)

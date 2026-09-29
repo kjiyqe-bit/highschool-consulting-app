@@ -987,9 +987,13 @@ async function handleSchoolSubmit(event) {
         '연도': year,
         '학교명': name,
         '학생 수': students,
+        '학생수': students,
         '전교 학생수': students,
+        '전교학생수': students,
+        'studentCount': students,
         '학교 유형': schoolType,
-        '교과 편성표(링크)': link
+        '교과 편성표(링크)': link,
+        '링크': link
       })
     });
 
