@@ -282,9 +282,10 @@ async function loadData() {
       // 동기화 시간 표시
       if (syncEl) syncEl.textContent = result.data.last_synced || '방금 전';
 
-      // 통계 및 리스트 갱신
+      // 통계, 리스트 및 입력 탭 자동완성 datalist 갱신
       updateStatistics();
       renderSchoolList();
+      updateSchoolDatalist();
     } else {
       throw new Error(result.error || '구글 시트 데이터 형식이 올바르지 않습니다.');
     }
@@ -325,6 +326,25 @@ function updateStatistics() {
   if (statProg) statProg.innerHTML = `${state.programs.length}<span class="text-sm font-normal text-slate-400 ml-1">건</span>`;
 }
 
+/**
+ * 입력 탭의 학교명 자동완성 Datalist 동적 갱신
+ */
+function updateSchoolDatalist() {
+  const datalist = document.getElementById('school-datalist');
+  if (!datalist) return;
+
+  const distinctSchools = getAllDistinctSchools();
+  datalist.innerHTML = distinctSchools.map(s => `<option value="${s}"></option>`).join('');
+}
+
+/**
+ * 연도 입력값을 순수 4자리 숫자 문자열로 정제 ("2026년" -> "2026")
+ */
+function cleanYear(val) {
+  const s = String(val || '').replace(/[^0-9]/g, '');
+  return s.length >= 4 ? s.substring(0, 4) : s;
+}
+
 // ===================================================================
 // 6. 데이터 종합(Aggregation) 엔진
 // ===================================================================
@@ -356,10 +376,12 @@ function getAllDistinctSchools() {
  * 특정 학교명 및 연도에 대한 모든 누적 데이터를 하나로 종합(Aggregation)
  */
 function aggregateSchoolInfo(schoolName, targetYear) {
+  const cleanTargetYear = cleanYear(targetYear);
+
   // 1) 기본 정보 (학생수, 링크 등)
   let schoolInfo = state.schools.find(s => {
     const nameMatch = (s['학교명'] || '').trim() === schoolName;
-    const yearMatch = targetYear === 'ALL' || String(s['연도'] || '') === String(targetYear);
+    const yearMatch = targetYear === 'ALL' || cleanYear(s['연도']) === cleanTargetYear;
     return nameMatch && yearMatch;
   });
 
@@ -376,14 +398,14 @@ function aggregateSchoolInfo(schoolName, targetYear) {
   // 2) 수시 합격 실적 필터링
   const sushiList = state.sushi.filter(s => {
     const nameMatch = (s['학교명'] || '').trim() === schoolName;
-    const yearMatch = targetYear === 'ALL' || String(s['연도'] || '') === String(targetYear);
+    const yearMatch = targetYear === 'ALL' || cleanYear(s['연도']) === cleanTargetYear;
     return nameMatch && yearMatch;
   });
 
   // 3) 특별 프로그램 및 우수 동아리 필터링
   const progList = state.programs.filter(p => {
     const nameMatch = (p['학교명'] || '').trim() === schoolName;
-    const yearMatch = targetYear === 'ALL' || String(p['연도'] || '') === String(targetYear);
+    const yearMatch = targetYear === 'ALL' || cleanYear(p['연도']) === cleanTargetYear;
     return nameMatch && yearMatch;
   });
 
@@ -438,9 +460,10 @@ function renderSchoolList() {
     const data = aggregateSchoolInfo(schoolName, yearFilter);
     const initial = schoolName.substring(0, 1);
     const progressPercent = Math.min(100, data.collectionScore * 10);
+    const safeSchoolName = schoolName.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
     return `
-      <div onclick="openSchoolModal('${schoolName}', '${yearFilter}')" class="school-card bg-white rounded-2xl p-5 border border-slate-200 shadow-sm cursor-pointer space-y-4">
+      <div onclick="openSchoolModal('${safeSchoolName}', '${yearFilter}')" class="school-card bg-white rounded-2xl p-5 border border-slate-200 shadow-sm cursor-pointer space-y-4">
         
         <!-- 학교 헤더 -->
         <div class="flex items-start justify-between gap-2">
@@ -735,14 +758,17 @@ async function handleProgramSubmit(event) {
   const category = document.getElementById('prog-category').value;
   const year = document.getElementById('prog-year').value;
   const school = document.getElementById('prog-school').value.trim();
-  const name = document.getElementById('prog-name').value.trim();
+  const rawName = document.getElementById('prog-name').value.trim();
   const content = document.getElementById('prog-content').value.trim();
   const author = state.user ? state.user.name : '상담진';
 
-  if (!school || !name) {
+  if (!school || !rawName) {
     alert('학교명과 프로그램/동아리 명칭을 입력해 주세요.');
     return;
   }
+
+  // 우수동아리 카테고리 선택 시 명칭에 [우수동아리] 태그 자동 부여
+  const name = (category === '우수동아리' && !rawName.includes('[우수동아리]')) ? `[우수동아리] ${rawName}` : rawName;
 
   btn.disabled = true;
   btn.innerHTML = `<span class="animate-pulse">구글 시트에 저장 중...</span>`;
@@ -763,15 +789,15 @@ async function handleProgramSubmit(event) {
 
     const result = await res.json();
     if (result.success) {
-      showToast(`'${name}'(${category}) 정보가 구글 시트에 저장되었습니다!`, 'success');
+      showToast(`'${name}' 정보가 구글 시트에 성공적으로 저장되었습니다!`, 'success');
       document.getElementById('prog-name').value = '';
       document.getElementById('prog-content').value = '';
       await loadData();
     } else {
-      alert(`저장 실패: ${result.error}`);
+      alert(`저장 실패: ${result.error || '알 수 없는 오류'}`);
     }
   } catch (e) {
-    alert('서버 통신 오류 발생');
+    alert('서버 통신 오류가 발생했습니다.');
   } finally {
     btn.disabled = false;
     btn.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i><span>프로그램/동아리 정보 구글 시트에 누적 저장</span>`;
@@ -942,6 +968,8 @@ window.handleSchoolSubmit = handleSchoolSubmit;
 window.openAdminModal = openAdminModal;
 window.closeAdminModal = closeAdminModal;
 window.saveAdminConfig = saveAdminConfig;
+window.updateSchoolDatalist = updateSchoolDatalist;
+window.cleanYear = cleanYear;
 window.showErrorModal = showErrorModal;
 window.closeErrorModal = closeErrorModal;
 
