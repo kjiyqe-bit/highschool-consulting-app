@@ -355,6 +355,26 @@ function cleanYear(val) {
   return s.length >= 4 ? s.substring(0, 4) : s;
 }
 
+/**
+ * 학년도 숫자 기반 애플 스타일 파스텔톤 동적 배지 클래스 반환
+ * - 2026학년도: 세련된 보라색 (bg-purple-50 text-purple-700 border-purple-200/80)
+ * - 2025학년도: 은은한 초록색 (bg-emerald-50 text-emerald-700 border-emerald-200/80)
+ * - 2024학년도: 부드러운 파란색 (bg-blue-50 text-blue-700 border-blue-200/80)
+ * - 기타: 차분한 그레이 (bg-slate-100 text-slate-700 border-slate-200/80)
+ */
+function getYearBadgeColorClass(yearStr) {
+  const cleanNum = String(yearStr || '').replace(/[^0-9]/g, '');
+  if (cleanNum.includes('2026')) {
+    return 'bg-purple-50 text-purple-700 border-purple-200/80 shadow-sm';
+  } else if (cleanNum.includes('2025')) {
+    return 'bg-emerald-50 text-emerald-700 border-emerald-200/80 shadow-sm';
+  } else if (cleanNum.includes('2024')) {
+    return 'bg-blue-50 text-blue-700 border-blue-200/80 shadow-sm';
+  } else {
+    return 'bg-slate-100 text-slate-700 border-slate-200/80';
+  }
+}
+
 // ===================================================================
 // 6. 데이터 종합(Aggregation) 엔진
 // ===================================================================
@@ -536,7 +556,7 @@ function renderSchoolList() {
               <p class="text-xs text-[#86868B] mt-1 font-medium">전교 학생수: <b class="text-[#1D1D1F]">${data.students}</b>명</p>
             </div>
           </div>
-          <span class="text-[11px] px-2.5 py-1 rounded-full font-bold bg-[#F5F5F7] text-[#1D1D1F] border border-black/5 flex-shrink-0">${data.year}</span>
+          <span class="text-[11px] px-2.5 py-1 rounded-full font-bold border flex-shrink-0 ${getYearBadgeColorClass(data.year)}">${data.year}</span>
         </div>
 
         <!-- 실적 배지 요약 -->
