@@ -364,15 +364,15 @@
                 </div>
               </div>
 
-              <!-- 학교코드 및 파일명 규칙 배너 -->
+              <!-- 학교코드 안내 배너 -->
               <div class="bg-cyan-50/70 border border-cyan-200/80 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div class="flex items-center space-x-3">
                   <div class="w-8 h-8 rounded-lg bg-cyan-600 text-white flex items-center justify-center font-bold flex-shrink-0">
                     <i data-lucide="key" class="w-4 h-4"></i>
                   </div>
                   <div>
-                    <span class="text-xs font-semibold text-cyan-900">A열 학교 고유번호(학교코드) 및 업로드 파일명</span>
-                    <p class="text-[11px] text-cyan-700">연도 + 학교명 앞 4글자로 결합되며, <b>구글 드라이브 업로드 시 파일명도 동일하게 생성</b>됩니다.</p>
+                    <span class="text-xs font-semibold text-cyan-900">A열 학교 고유번호(학교코드)</span>
+                    <p class="text-[11px] text-cyan-700">연도 + 학교명 앞 4글자로 자동 조합되어 '학교_기본정보' A열 고유값으로 등록됩니다.</p>
                   </div>
                 </div>
                 <div class="text-left sm:text-right">
@@ -381,68 +381,22 @@
                 </div>
               </div>
 
-              <!-- 교과 편성표 (E열) 파일 업로드 (구글 드라이브 연계) -->
-              <div class="space-y-3">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <label class="block text-xs font-semibold text-slate-700">
-                      교과 편성표 업로드 (E열) <span class="text-rose-500">*</span>
-                    </label>
-                    <span class="text-[11px] text-slate-500">
-                      ※ 파일명은 학교 고유번호로 자동 생성되며, 업로드 링크가 시트 <b>E열</b>에 반영됩니다.
-                    </span>
-                  </div>
-                  
-                  <div class="flex items-center gap-2">
-                    <a href="https://drive.google.com/drive/folders/1VV99M5R7i0392maHg3qyK5GYodGoNnrf?usp=drive_link" target="_blank" class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg transition-colors">
-                      <i data-lucide="folder-symlink" class="w-3.5 h-3.5"></i>
-                      <span>지정 구글 드라이브 폴더 열기</span>
-                    </a>
-                    
-                    <div class="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-[11px] font-medium">
-                      <button type="button" id="tab-btn-file" onclick="setCurriculumMode('file')" class="px-2.5 py-1 rounded bg-white text-slate-800 shadow-2xs font-semibold">파일 첨부</button>
-                      <button type="button" id="tab-btn-url" onclick="setCurriculumMode('url')" class="px-2.5 py-1 rounded text-slate-500 hover:text-slate-800">외부 링크 입력</button>
-                    </div>
-                  </div>
+              <!-- 교과 편성표 링크 (E열) 직접 입력 (파일 업로드 기능 제거됨) -->
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <label class="block text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                    <i data-lucide="link" class="w-3.5 h-3.5 text-cyan-600"></i>
+                    <span>교과 편성표 링크 (E열)</span>
+                  </label>
+                  <a href="https://drive.google.com/drive/folders/1VV99M5R7i0392maHg3qyK5GYodGoNnrf?usp=drive_link" target="_blank" class="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 transition-colors">
+                    <i data-lucide="folder-symlink" class="w-3.5 h-3.5"></i>
+                    <span>지정 구글 드라이브 폴더 열기</span>
+                  </a>
                 </div>
-
-                <!-- 파일 드롭존 -->
-                <div id="curriculum-file-box" class="border-2 border-dashed border-slate-300 hover:border-cyan-500 rounded-2xl p-6 text-center bg-slate-50/50 transition-colors">
-                  <input type="file" id="school-file-input" onchange="onCurriculumFileSelected(event)" class="hidden" accept=".pdf,.doc,.docx,.hwp,.xls,.xlsx,.png,.jpg,.jpeg">
-                  
-                  <div id="file-empty-view" class="space-y-2 cursor-pointer" onclick="document.getElementById('school-file-input').click()">
-                    <div class="w-12 h-12 rounded-2xl bg-cyan-100/60 text-cyan-600 flex items-center justify-center mx-auto">
-                      <i data-lucide="upload-cloud" class="w-6 h-6"></i>
-                    </div>
-                    <div class="text-xs font-semibold text-slate-700">클릭하여 교과 편성표 문서를 첨부하세요</div>
-                    <p class="text-[11px] text-slate-400">PDF, HWP, Word, Excel, 이미지 등 (구글 드라이브 폴더에 학교코드로 저장됩니다)</p>
-                  </div>
-
-                  <div id="file-selected-view" class="hidden flex items-center justify-between bg-white p-3.5 rounded-xl border border-cyan-200">
-                    <div class="flex items-center space-x-3">
-                      <i data-lucide="file-text" class="w-6 h-6 text-cyan-600"></i>
-                      <div class="text-left">
-                        <div id="selected-filename" class="text-xs font-bold text-slate-900 truncate max-w-xs">curriculum.pdf</div>
-                        <div class="flex items-center gap-2 mt-0.5">
-                          <span id="selected-filesize" class="text-[10px] text-slate-400 font-mono">0 KB</span>
-                          <span class="text-[10px] text-cyan-700 bg-cyan-50 px-1.5 py-0.2 rounded font-semibold">드라이브 저장 예정명: <span id="target-upload-filename" class="font-mono">2026미입력.pdf</span></span>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <span id="upload-status-badge" class="text-[10px] font-semibold text-cyan-600 bg-cyan-50 px-2 py-1 rounded">업로드 준비됨</span>
-                      <button type="button" onclick="cancelCurriculumFile()" class="p-1 text-slate-400 hover:text-rose-500">
-                        <i data-lucide="x" class="w-4 h-4"></i>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div id="curriculum-url-box" class="hidden">
-                  <input type="url" id="school-curriculum-url" placeholder="https://drive.google.com/... 또는 웹 링크 입력" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:bg-white focus:outline-none transition-all">
-                </div>
-
-                <input type="hidden" id="final-curriculum-link" value="">
+                <input type="text" id="school-curriculum-url" placeholder="예: 구글 드라이브 링크, 학교 홈페이지 링크 또는 '링크입력예정'" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:bg-white focus:outline-none transition-all">
+                <p class="text-[11px] text-slate-400">
+                  ※ 교과 편성표 파일이 저장된 구글 드라이브 공유 링크나 웹 주소를 입력하세요. (대시보드에서 클릭 시 바로 열립니다)
+                </p>
               </div>
 
               <!-- 저장 버튼 -->

@@ -534,10 +534,10 @@ async function uploadFileToServer(file, schoolCode, overwrite = false) {
 }
 
 /**
- * 학교 기본 정보 등록 처리
- * - 파일 중복 시 대화창 확인 (삭제 후 업로드 vs 취소)
+ * 학교 기본 정보 등록 처리 (파일 업로드 기능 제거 및 링크 직접 입력형)
+ * - 복잡한 파일 업로드 및 대기를 제거하여 즉시 1초 이내 등록 완료
  * - 학교 정보 중복 시 대화창 확인 (수정(신규 로그로 누적) vs 아니오)
- * - E열에 업로드된 파일 링크 반영
+ * - E열에 입력된 교과 편성표 링크 반영
  */
 async function handleSchoolSubmit(event) {
   event.preventDefault();
@@ -548,53 +548,14 @@ async function handleSchoolSubmit(event) {
   const students = document.getElementById('school-students').value.trim();
   const schoolCode = `${year}${name.substring(0, 4)}`;
 
-  let curriculumLink = '링크입력예정';
-  let overwriteFile = false;
+  // 교과 편성표 링크(URL) 가져오기
+  const urlInput = document.getElementById('school-curriculum-url');
+  const curriculumLink = (urlInput ? urlInput.value.trim() : '') || '링크입력예정';
 
   try {
     // -------------------------------------------------------------
-    // 단계 1. 교과 편성표 파일 업로드 및 중복 검사
+    // 단계 1. 학교 정보 중복 확인 (이력 로그 보존 & 새로운 로그 누적)
     // -------------------------------------------------------------
-    if (state.curriculumMode === 'file' && state.selectedFile) {
-      const ext = state.selectedFile.name.split('.').pop() || 'pdf';
-      const targetFilename = `${schoolCode}.${ext}`;
-
-      // 구글 드라이브/서버에 기존 파일이 존재하는지 확인
-      const fileExists = await checkFileExists(schoolCode, state.selectedFile.name);
-      if (fileExists) {
-        // 중복 대화창 표시 및 사용자 선택 대기
-        const shouldOverwrite = await promptFileOverwrite(targetFilename);
-        if (!shouldOverwrite) {
-          showToast('파일 업로드가 취소되었습니다.', 'info');
-          return; // 진행 중단
-        }
-        overwriteFile = true;
-      }
-
-      btn.disabled = true;
-      btn.innerHTML = `<span class="animate-pulse">드라이브 폴더 파일 업로드 중...</span>`;
-      document.getElementById('upload-status-badge').textContent = '드라이브 폴더 저장 중...';
-
-      const uploadResult = await uploadFileToServer(state.selectedFile, schoolCode, overwriteFile);
-      curriculumLink = uploadResult.url;
-
-      // 드라이브 업로드 성공 여부에 따라 상태 배지 업데이트
-      if (uploadResult.isDriveUploaded) {
-        document.getElementById('upload-status-badge').textContent = '드라이브 업로드 완료';
-      } else {
-        document.getElementById('upload-status-badge').textContent = '업로드 완료 (드라이브 연동 확인 필요)';
-        console.warn('[파일 업로드] 드라이브 연동 실패, 로컬 저장 URL 사용:', curriculumLink);
-      }
-
-    } else if (state.curriculumMode === 'url') {
-      const urlVal = document.getElementById('school-curriculum-url').value.trim();
-      if (urlVal) curriculumLink = urlVal;
-    }
-
-    // -------------------------------------------------------------
-    // 단계 2. 학교 정보 중복 확인 (이력 로그 보존 & 새로운 로그 누적)
-    // -------------------------------------------------------------
-    // 기존에 등록된 학교 정보 중 동일 학교코드가 있는지 탐색
     const existingSchool = state.schools.find(s => s['학교코드(고유값)'] === schoolCode);
     let isUpdateLog = false;
 
@@ -612,7 +573,7 @@ async function handleSchoolSubmit(event) {
     btn.innerHTML = `<span class="animate-pulse">데이터베이스 기록 반영 중...</span>`;
 
     // -------------------------------------------------------------
-    // 단계 3. 학교 기본 정보 데이터베이스 등록 요청
+    // 단계 2. 학교 기본 정보 데이터베이스 등록 요청
     // -------------------------------------------------------------
     const payload = {
       "연도": year,
@@ -639,8 +600,7 @@ async function handleSchoolSubmit(event) {
       // 입력 폼 초기화
       document.getElementById('school-name').value = '';
       document.getElementById('school-students').value = '';
-      cancelCurriculumFile();
-      document.getElementById('school-curriculum-url').value = '';
+      if (urlInput) urlInput.value = '';
       updateGeneratedCodePreview();
       
       // 데이터 갱신
@@ -1226,12 +1186,16 @@ function getSchoolAggregatedInfo(schoolName, year) {
     }).join('\n');
   }
 
-  // 5. 진행 중인 특별 프로그램 종합 요약문 생성
+  // 5. 진행 중인 특별 프로그램 종합 요약문 생성 (명칭 + 주요 내용 결합)
   let progSummary = dashboardItem ? String(dashboardItem['진행 중인 특별 프로그램'] || '').trim() : '';
-  // 만약 시트에 수동 요약문이 없다면, 등록된 프로그램 목록의 명칭을 결합하여 자동 취합
+  // 만약 시트에 수동 요약문이 없다면, 등록된 프로그램 목록의 명칭과 주요 내용을 결합하여 자동 취합
   if (!progSummary && schoolProgs.length > 0) {
-    const titles = schoolProgs.map(p => String(p['프로그램 명칭'] || '').trim()).filter(Boolean);
-    progSummary = titles.join(', ');
+    const titles = schoolProgs.map(p => {
+      const title = String(p['프로그램 명칭'] || p['프로그램명'] || '').trim();
+      const content = String(p['프로그램 주요 내용'] || p['프로그램 주요내용'] || p['주요 내용'] || '').trim();
+      return content ? `${title} (${content})` : title;
+    }).filter(Boolean);
+    progSummary = titles.join(' / ');
   }
 
   // 6. 데이터 수집 현황 및 달성률 실시간 계산
@@ -1640,22 +1604,44 @@ function renderModalProgramList(schoolName, year, preAgg) {
   }
 
   let html = '';
-  // 1. 개별 프로그램 카드 목록
+  // 1. 개별 프로그램 카드 목록 (E열 '프로그램 주요 내용' 전용 박스 강조 표출)
   if (schoolProgs.length > 0) {
+    html += '<div class="space-y-3">';
     schoolProgs.forEach(prog => {
+      const title = prog['프로그램 명칭'] || prog['프로그램명'] || '프로그램';
+      // 구글 DB 시트 '특별프로그램_입력' E열(프로그램 주요 내용) 추출
+      const content = String(
+        prog['프로그램 주요 내용'] || 
+        prog['프로그램 주요내용'] || 
+        prog['주요 내용'] || 
+        prog['프로그램내용'] ||
+        (Object.keys(prog).length >= 5 ? Object.values(prog)[4] : '') ||
+        ''
+      ).trim();
+      const author = prog['입력자'] || '-';
+
       html += `
-        <div class="bg-amber-50/40 p-4 rounded-2xl border border-amber-100 space-y-2">
+        <div class="bg-amber-50/50 p-4 rounded-2xl border border-amber-200/80 space-y-2.5 shadow-2xs">
           <div class="flex items-center justify-between">
             <h4 class="font-bold text-slate-900 text-sm flex items-center gap-2">
-              <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-              ${escapeHtml(prog['프로그램 명칭'] || '')}
+              <span class="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-xs"></span>
+              <span class="text-amber-950 font-extrabold text-base">${escapeHtml(title)}</span>
             </h4>
-            <span class="text-[11px] text-slate-400">작성자: ${escapeHtml(prog['입력자'] || '-')}</span>
+            <span class="text-[11px] text-slate-400 bg-white px-2 py-0.5 rounded border border-slate-200">입력자: ${escapeHtml(author)}</span>
           </div>
-          <p class="text-xs text-slate-700 whitespace-pre-line bg-white p-3 rounded-xl border border-amber-100/80 leading-relaxed">${escapeHtml(prog['프로그램 주요 내용'] || '')}</p>
+          <div class="bg-white p-3.5 rounded-xl border border-amber-100/90 space-y-1">
+            <span class="text-[11px] font-bold text-amber-800 flex items-center gap-1">
+              <i data-lucide="file-text" class="w-3.5 h-3.5 text-amber-500"></i>
+              <span>프로그램 주요 내용 (E열)</span>
+            </span>
+            <p class="text-xs text-slate-700 whitespace-pre-line leading-relaxed font-medium">
+              ${content ? escapeHtml(content) : '<span class="text-slate-400 italic">등록된 세부 내용이 없습니다.</span>'}
+            </p>
+          </div>
         </div>
       `;
     });
+    html += '</div>';
   } else if (rawProgSummary) {
     html += `
       <div class="p-4 bg-amber-50/60 rounded-xl border border-amber-200/80">

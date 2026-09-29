@@ -537,7 +537,15 @@ class handler(http.server.BaseHTTPRequestHandler):
                 emp_match = (row_emp_no == emp_no) or (row_emp_no.replace(" ", "") == clean_input_emp)
 
                 if name_match and phone_match and emp_match:
-                    raw_auth = str(row.get("권한", "일반")).strip()
+                    # 구글 시트 '접근 권한' 시트 D열 헤더("관리자" 또는 "권한") 및 셀 값 검사
+                    raw_auth = str(row.get("관리자") or row.get("권한") or "").strip()
+                    if not raw_auth:
+                        # 컬럼명이 다른 경우를 대비해 행의 모든 값 중 "관리자" 문자열 검색
+                        for k, v in row.items():
+                            if k != "_id" and "관리자" in str(v):
+                                raw_auth = "관리자"
+                                break
+
                     role = "admin" if ("관리자" in raw_auth or "admin" in raw_auth.lower()) else "user"
                     matched_user = {
                         "name": row_name,
