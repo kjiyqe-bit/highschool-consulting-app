@@ -502,6 +502,7 @@ class handler(http.server.BaseHTTPRequestHandler):
 
             saved_items = []
             for it in items:
+                timestamp = str(it.get("입력 시간", "")).strip() or datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 year = str(it.get("연도", "2026")).strip()
                 school = str(it.get("학교명", "")).strip()
                 rank = str(it.get("전교 등수", it.get("전교등수", ""))).strip()
@@ -515,6 +516,7 @@ class handler(http.server.BaseHTTPRequestHandler):
                     continue
 
                 row_obj = {
+                    "입력 시간": timestamp,
                     "연도": year,
                     "학교명": school,
                     "전교 등수": rank,
@@ -542,6 +544,7 @@ class handler(http.server.BaseHTTPRequestHandler):
         # 4. [특별 프로그램 및 우수 동아리 등록] (/api/programs)
         # -------------------------------------------------------------------
         if route == "programs":
+            timestamp = str(body.get("입력 시간", "")).strip() or datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             year = str(body.get("연도", "2026")).strip()
             school = str(body.get("학교명", "")).strip()
             category = str(body.get("구분", "특별프로그램")).strip()
@@ -556,6 +559,7 @@ class handler(http.server.BaseHTTPRequestHandler):
             full_title = f"[{category}] {prog_name}" if category and not prog_name.startswith("[") else prog_name
 
             new_record = {
+                "입력 시간": timestamp,
                 "연도": year,
                 "학교명": school,
                 "프로그램 명칭": full_title,

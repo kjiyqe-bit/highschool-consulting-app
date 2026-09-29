@@ -484,20 +484,21 @@ function aggregateSchoolInfo(schoolName, targetYear) {
   });
 
   if (!schoolInfo) {
-    schoolInfo = state.schools.find(s => (s['학교명'] || '').trim() === schoolName) || {
-      '학교명': schoolName,
-      '학년도': targetYear === 'ALL' ? '2026학년도' : targetYear,
-      '학생 수': '미등록',
-      '전교 학생수': '미등록',
-      '학교 유형': '일반고',
-      '교과 편성표(링크)': ''
-    };
+    schoolInfo = state.schools.find(s => (s['학교명'] || '').trim() === schoolName) || {};
   }
 
   const rawYear = schoolInfo['학년도'] || schoolInfo['연도'] || targetYear;
-  const yearDisplay = rawYear.endsWith('학년도') || rawYear.endsWith('년') ? rawYear : `${rawYear}학년도`;
-  const schoolType = schoolInfo['학교 유형'] || schoolInfo['학교유형'] || '일반고';
-  const students = schoolInfo['학생 수'] || schoolInfo['학생수'] || schoolInfo['전교 학생수'] || schoolInfo['전교학생수'] || '미등록';
+  const yearDisplay = cleanYear(rawYear);
+
+  // 학교 유형 정밀 파싱
+  const schoolType = (schoolInfo['학교 유형'] || schoolInfo['학교유형'] || schoolInfo['유형'] || '일반고').trim() || '일반고';
+
+  // 학생 수 정밀 파싱 (숫자 추출)
+  const rawStudents = schoolInfo['학생 수'] || schoolInfo['학생수'] || schoolInfo['전교 학생수'] || schoolInfo['전교학생수'] || schoolInfo['studentCount'] || '';
+  let students = String(rawStudents || '').replace(/[^0-9]/g, '');
+  if (!students) {
+    students = '미등록';
+  }
 
   // 2) 수시 합격 실적 필터링
   const sushiList = state.sushi.filter(s => {
@@ -829,6 +830,7 @@ async function handleSushiSubmit(event) {
 
     if (univ) {
       items.push({
+        '입력 시간': new Date().toISOString().replace('T', ' ').substring(0, 19),
         '연도': year,
         '학교명': school,
         '전교 등수': rank,
@@ -924,6 +926,7 @@ async function handleProgramSubmit(event) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        '입력 시간': new Date().toISOString().replace('T', ' ').substring(0, 19),
         '구분': category,
         '연도': year,
         '학교명': school,
