@@ -1,12 +1,92 @@
-/* 고교 수시 상담센터 기본 스타일 (style.css - Reboot v1) */
+@charset "UTF-8";
+
+/* 애플(Apple) 스타일 디자인 시스템 글로벌 CSS */
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
-body {
-  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
-  background-color: #f8fafc;
+:root {
+  --apple-bg: #F5F5F7;
+  --apple-card: #FFFFFF;
+  --apple-blue: #007AFF;
+  --apple-blue-hover: #0062CC;
+  --apple-text-main: #1D1D1F;
+  --apple-text-sub: #86868B;
+  --apple-border: rgba(0, 0, 0, 0.08);
 }
 
-/* 부드러운 전환 효과 */
-button, input, select {
-  transition: all 0.15s ease-in-out;
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Pretendard", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  background-color: var(--apple-bg);
+  color: var(--apple-text-main);
+  letter-spacing: -0.015em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* 애플 스타일 은은하고 깊이감 있는 소프트 드롭 섀도우 */
+.apple-card-shadow {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.apple-card-shadow:hover {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.03);
+  transform: translateY(-2px);
+}
+
+/* 모바일 터치 피드백 애니메이션 */
+.apple-button-touch {
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.apple-button-touch:active {
+  transform: scale(0.97);
+  opacity: 0.9;
+}
+
+/* iOS 세그먼트 컨트롤 탭 활성화 효과 */
+.segmented-btn {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.segmented-btn.active {
+  background-color: #FFFFFF;
+  color: #1D1D1F;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.04);
+  font-weight: 700;
+}
+
+/* 애플 스타일 모달 애니메이션 (iOS 바텀시트 / 모달 팝업) */
+.apple-modal-animate {
+  animation: appleModalSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes appleModalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 애플 스타일 커스텀 스크롤바 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
 }

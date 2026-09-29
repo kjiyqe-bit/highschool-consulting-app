@@ -155,17 +155,19 @@ function applyUserSession() {
 
     // 사용자 정보 표시
     const nameEl = document.getElementById('user-name-display');
+    const nameElMobile = document.getElementById('user-name-display-mobile');
     const roleBadge = document.getElementById('user-role-badge');
     const empEl = document.getElementById('user-emp-display');
 
     if (nameEl) nameEl.textContent = state.user.name;
+    if (nameElMobile) nameElMobile.textContent = state.user.name;
     if (empEl) empEl.textContent = `사번: ${state.user.emp_no}`;
     if (roleBadge) {
       roleBadge.textContent = state.user.role_label;
       if (state.user.role === 'admin') {
-        roleBadge.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-800 border border-amber-300';
+        roleBadge.className = 'text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-amber-100 text-amber-800 border border-amber-200';
       } else {
-        roleBadge.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-600 border border-slate-200';
+        roleBadge.className = 'text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-[#E5E5EA] text-[#1D1D1F]';
       }
     }
 
@@ -463,49 +465,49 @@ function renderSchoolList() {
     const safeSchoolName = schoolName.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
     return `
-      <div onclick="openSchoolModal('${safeSchoolName}', '${yearFilter}')" class="school-card bg-white rounded-2xl p-5 border border-slate-200 shadow-sm cursor-pointer space-y-4">
+      <div onclick="openSchoolModal('${safeSchoolName}', '${yearFilter}')" class="school-card bg-white rounded-3xl p-5 border border-black/5 apple-card-shadow cursor-pointer space-y-4 transition-all apple-button-touch">
         
         <!-- 학교 헤더 -->
         <div class="flex items-start justify-between gap-2">
           <div class="flex items-center gap-3">
-            <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-lg flex items-center justify-center shadow-md shadow-blue-500/20 flex-shrink-0">
+            <div class="w-12 h-12 rounded-2xl bg-[#007AFF] text-white font-extrabold text-lg flex items-center justify-center shadow-md shadow-blue-500/20 flex-shrink-0">
               ${initial}
             </div>
             <div>
-              <h3 class="font-extrabold text-slate-900 text-base leading-tight">${schoolName}</h3>
-              <p class="text-xs text-slate-400 mt-0.5">전교 학생수: <b class="text-slate-700">${data.students}</b>명</p>
+              <h3 class="font-extrabold text-[#1D1D1F] text-base leading-tight">${schoolName}</h3>
+              <p class="text-xs text-[#86868B] mt-0.5 font-medium">전교 학생수: <b class="text-[#1D1D1F]">${data.students}</b>명</p>
             </div>
           </div>
-          <span class="text-[11px] px-2.5 py-1 rounded-full font-bold bg-slate-100 text-slate-600 border border-slate-200">${data.year}년</span>
+          <span class="text-[11px] px-2.5 py-1 rounded-full font-bold bg-[#F5F5F7] text-[#1D1D1F] border border-black/5">${data.year}년</span>
         </div>
 
         <!-- 실적 배지 요약 -->
         <div class="grid grid-cols-2 gap-2 text-xs">
-          <div class="p-2.5 rounded-xl bg-emerald-50/80 border border-emerald-100 flex items-center gap-2">
-            <i data-lucide="award" class="w-4 h-4 text-emerald-600 flex-shrink-0"></i>
+          <div class="p-3 rounded-2xl bg-emerald-50/80 border border-emerald-100/80 flex items-center gap-2.5">
+            <i data-lucide="award" class="w-4 h-4 text-[#34C759] flex-shrink-0"></i>
             <div>
-              <span class="text-[10px] text-slate-500 block">수시 합격</span>
-              <span class="font-bold text-emerald-700">${data.sushiList.length}건</span>
+              <span class="text-[10px] text-[#86868B] block font-medium">수시 합격</span>
+              <span class="font-extrabold text-[#34C759]">${data.sushiList.length}건</span>
             </div>
           </div>
 
-          <div class="p-2.5 rounded-xl bg-indigo-50/80 border border-indigo-100 flex items-center gap-2">
-            <i data-lucide="sparkles" class="w-4 h-4 text-indigo-600 flex-shrink-0"></i>
+          <div class="p-3 rounded-2xl bg-indigo-50/80 border border-indigo-100/80 flex items-center gap-2.5">
+            <i data-lucide="sparkles" class="w-4 h-4 text-[#5856D6] flex-shrink-0"></i>
             <div>
-              <span class="text-[10px] text-slate-500 block">프로그램/동아리</span>
-              <span class="font-bold text-indigo-700">${data.progList.length}건</span>
+              <span class="text-[10px] text-[#86868B] block font-medium">프로그램/동아리</span>
+              <span class="font-extrabold text-[#5856D6]">${data.progList.length}건</span>
             </div>
           </div>
         </div>
 
-        <!-- 수집 진행도 바 -->
-        <div class="space-y-1.5 pt-1 border-t border-slate-100">
+        <!-- 데이터 수집 진행도 바 -->
+        <div class="space-y-1.5 pt-2 border-t border-black/5">
           <div class="flex justify-between text-[11px]">
-            <span class="text-slate-400">데이터 수집 진행도</span>
-            <span class="font-bold text-blue-600">${data.collectionScore} / 10</span>
+            <span class="text-[#86868B] font-medium">데이터 수집 진행도</span>
+            <span class="font-extrabold text-[#007AFF]">${data.collectionScore} / 10</span>
           </div>
-          <div class="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
-            <div class="h-full bg-blue-600 rounded-full transition-all duration-500" style="width: ${progressPercent}%;"></div>
+          <div class="w-full h-2 rounded-full bg-[#F5F5F7] overflow-hidden">
+            <div class="h-full bg-[#007AFF] rounded-full transition-all duration-500" style="width: ${progressPercent}%;"></div>
           </div>
         </div>
 
@@ -567,13 +569,13 @@ function openSchoolModal(schoolName, year) {
     });
 
     sushiTbody.innerHTML = sortedSushi.map(item => `
-      <tr class="hover:bg-slate-50 transition-colors">
-        <td class="py-2.5 px-3 font-bold text-blue-600">${item['전교 등수'] || item['전교등수'] || '-'}</td>
-        <td class="py-2.5 px-3 font-bold text-slate-900">${item['합격 대학'] || item['합격대학'] || '-'}</td>
-        <td class="py-2.5 px-3 text-slate-700">${item['합격 학과'] || item['합격학과'] || '-'}</td>
-        <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px]">${item['전형명'] || '-'}</span></td>
-        <td class="py-2.5 px-3 font-bold text-emerald-600">${item['내신 등급'] || item['내신등급'] || '-'}</td>
-        <td class="py-2.5 px-3 text-[11px] text-slate-400">${item['입력자'] || '-'}</td>
+      <tr class="hover:bg-[#F5F5F7] transition-colors">
+        <td class="py-3 px-3.5 font-extrabold text-[#007AFF]">${item['전교 등수'] || item['전교등수'] || '-'}</td>
+        <td class="py-3 px-3.5 font-extrabold text-[#1D1D1F]">${item['합격 대학'] || item['합격대학'] || '-'}</td>
+        <td class="py-3 px-3.5 text-[#1D1D1F] font-semibold">${item['합격 학과'] || item['합격학과'] || '-'}</td>
+        <td class="py-3 px-3.5"><span class="px-2.5 py-0.5 rounded-full bg-[#E5E5EA] text-[#1D1D1F] text-[10px] font-bold">${item['전형명'] || '-'}</span></td>
+        <td class="py-3 px-3.5 font-extrabold text-[#34C759]">${item['내신 등급'] || item['내신등급'] || '-'}</td>
+        <td class="py-3 px-3.5 text-[11px] text-[#86868B]">${item['입력자'] || '-'}</td>
       </tr>
     `).join('');
   }
@@ -585,7 +587,7 @@ function openSchoolModal(schoolName, year) {
 
   if (data.progList.length === 0) {
     progListEl.innerHTML = `
-      <div class="col-span-full py-8 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+      <div class="col-span-full py-8 text-center text-[#86868B] bg-white rounded-2xl border border-dashed border-black/10">
         등록된 특별 프로그램 또는 동아리 정보가 없습니다.
       </div>
     `;
@@ -597,15 +599,15 @@ function openSchoolModal(schoolName, year) {
       const isClub = title.includes('[우수동아리]') || title.includes('동아리');
 
       return `
-        <div class="p-4 rounded-xl border ${isClub ? 'bg-indigo-50/40 border-indigo-200' : 'bg-blue-50/40 border-blue-200'} space-y-2">
+        <div class="p-4.5 rounded-2xl border ${isClub ? 'bg-indigo-50/60 border-indigo-100' : 'bg-blue-50/60 border-blue-100'} space-y-2.5 apple-card-shadow">
           <div class="flex items-center justify-between">
-            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${isClub ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}">
+            <span class="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${isClub ? 'bg-indigo-100 text-[#5856D6]' : 'bg-blue-100 text-[#007AFF]'}">
               ${isClub ? '우수 동아리' : '특별 프로그램'}
             </span>
-            <span class="text-[10px] text-slate-400">작성자: ${author}</span>
+            <span class="text-[10px] text-[#86868B]">작성자: ${author}</span>
           </div>
-          <h5 class="text-xs font-bold text-slate-900">${title}</h5>
-          <p class="text-xs text-slate-600 leading-relaxed bg-white/80 p-2.5 rounded-lg border border-slate-100 whitespace-pre-wrap">${content}</p>
+          <h5 class="text-xs font-extrabold text-[#1D1D1F]">${title}</h5>
+          <p class="text-xs text-[#1D1D1F] leading-relaxed bg-white/90 p-3 rounded-xl border border-black/5 whitespace-pre-wrap">${content}</p>
         </div>
       `;
     }).join('');
@@ -629,18 +631,18 @@ function addSushiSubRow() {
 
   const rowId = `sushi-sub-${Date.now()}-${Math.floor(Math.random()*1000)}`;
   const rowHtml = `
-    <div id="${rowId}" class="grid grid-cols-1 md:grid-cols-4 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 items-center">
+    <div id="${rowId}" class="grid grid-cols-1 sm:grid-cols-4 gap-2.5 p-3.5 bg-[#F5F5F7] rounded-2xl border border-black/5 items-center">
       <div>
-        <input type="text" placeholder="합격 대학 (예: 서울대)" required class="sub-univ w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-emerald-500">
+        <input type="text" placeholder="합격 대학 (예: 서울대)" required class="sub-univ w-full bg-white border-0 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-[#1D1D1F] focus:ring-2 focus:ring-[#34C759]">
       </div>
       <div>
-        <input type="text" placeholder="합격 학과 (예: 의예과)" class="sub-dept w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-emerald-500">
+        <input type="text" placeholder="합격 학과 (예: 의예과)" class="sub-dept w-full bg-white border-0 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-[#1D1D1F] focus:ring-2 focus:ring-[#34C759]">
       </div>
       <div>
-        <input type="text" placeholder="전형명 (예: 일반전형, 지균)" class="sub-type w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-emerald-500">
+        <input type="text" placeholder="전형명 (예: 일반전형, 지균)" class="sub-type w-full bg-white border-0 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-[#1D1D1F] focus:ring-2 focus:ring-[#34C759]">
       </div>
-      <div class="flex items-center gap-2">
-        <button type="button" onclick="removeSushiSubRow('${rowId}')" class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="이 항목 삭제">
+      <div class="flex items-center justify-end sm:justify-start gap-2">
+        <button type="button" onclick="removeSushiSubRow('${rowId}')" class="p-2 text-[#86868B] hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors apple-button-touch" title="이 항목 삭제">
           <i data-lucide="trash-2" class="w-4 h-4"></i>
         </button>
       </div>
@@ -936,12 +938,12 @@ function showToast(message, type = 'info') {
   if (!toast) return;
 
   const bgColors = {
-    success: 'bg-emerald-600',
+    success: 'bg-[#34C759]',
     error: 'bg-rose-600',
-    info: 'bg-slate-900'
+    info: 'bg-[#1D1D1F]'
   };
 
-  toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl shadow-xl text-xs font-bold text-white flex items-center gap-2 ${bgColors[type] || 'bg-slate-900'} modal-animate`;
+  toast.className = `fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-full shadow-2xl text-xs font-bold text-white flex items-center gap-2.5 ${bgColors[type] || 'bg-[#1D1D1F]'} apple-modal-animate border border-white/20`;
   toast.textContent = message;
   toast.classList.remove('hidden');
 
