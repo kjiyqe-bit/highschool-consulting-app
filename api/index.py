@@ -664,6 +664,7 @@ class handler(http.server.BaseHTTPRequestHandler):
                 "학교명": name,
                 "전교 학생수": students,
                 "교과 편성표(링크)": curriculum_link,
+                "링크": curriculum_link, # E열 다중 호환
                 "데이터 수집 현황": "0 / 10",
                 "등록일시": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
                 "_is_latest": True

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>고교 수시 합격 및 학교별 정보 대시 보드</title>
+  <title>고교 수시 합격 및 학교별 정보 대시보드</title>
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -17,6 +17,61 @@
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="style.css">
+  <style>
+    /* ====================================================================
+       모달 팝업 및 핵심 상호작용 스타일 (인라인 내장으로 404 방지)
+       ==================================================================== */
+    body {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    .nav-item.active {
+      background-color: #1e293b;
+      color: #ffffff;
+      border-left: 3px solid #3b82f6;
+    }
+    .mob-nav-item.active {
+      color: #2563eb;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    /* 모달 표시 핵심 클래스 - 이것이 누락되면 투명한 상태로 화면이 굳어버림 */
+    .modal-show {
+      opacity: 1 !important;
+      pointer-events: auto !important;
+    }
+    .modal-show #detail-modal-box,
+    .modal-show .transform {
+      transform: scale(1) !important;
+    }
+    .school-card {
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+    .school-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+      border-color: #93c5fd;
+    }
+    @keyframes toastIn {
+      from { transform: translateY(-20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .toast-animate {
+      animation: toastIn 0.25s ease-out forwards;
+    }
+  </style>
   <script>
     tailwind.config = {
       theme: {
@@ -180,11 +235,11 @@
 
           <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 mt-6 mb-2">상담 전용 뷰어</div>
           
-          <!-- [보기 탭] 학교별 정보 대시 보드 (수정됨) -->
+          <!-- [보기 탭] 학교별 정보 대시보드 (수정됨) -->
           <button onclick="switchTab('tab-dashboard')" id="nav-tab-dashboard" class="nav-item w-full flex items-center justify-between px-3.5 py-3 rounded-xl font-medium text-sm transition-all duration-200 hover:bg-slate-800 hover:text-white group">
             <div class="flex items-center space-x-3">
               <i data-lucide="layout-dashboard" class="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform"></i>
-              <span>학교별 정보 대시 보드</span>
+              <span>학교별 정보 대시보드</span>
             </div>
             <span class="text-[10px] bg-emerald-900/60 text-emerald-300 px-2 py-0.5 rounded-full font-bold">View</span>
           </button>
@@ -309,15 +364,15 @@
                 </div>
               </div>
 
-              <!-- 학교코드 및 파일명 규칙 배너 -->
+              <!-- 학교코드 안내 배너 -->
               <div class="bg-cyan-50/70 border border-cyan-200/80 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div class="flex items-center space-x-3">
                   <div class="w-8 h-8 rounded-lg bg-cyan-600 text-white flex items-center justify-center font-bold flex-shrink-0">
                     <i data-lucide="key" class="w-4 h-4"></i>
                   </div>
                   <div>
-                    <span class="text-xs font-semibold text-cyan-900">A열 학교 고유번호(학교코드) 및 업로드 파일명</span>
-                    <p class="text-[11px] text-cyan-700">연도 + 학교명 앞 4글자로 결합되며, <b>구글 드라이브 업로드 시 파일명도 동일하게 생성</b>됩니다.</p>
+                    <span class="text-xs font-semibold text-cyan-900">A열 학교 고유번호(학교코드)</span>
+                    <p class="text-[11px] text-cyan-700">연도 + 학교명 앞 4글자로 자동 조합되어 '학교_기본정보' A열 고유값으로 등록됩니다.</p>
                   </div>
                 </div>
                 <div class="text-left sm:text-right">
@@ -326,68 +381,22 @@
                 </div>
               </div>
 
-              <!-- 교과 편성표 (E열) 파일 업로드 (구글 드라이브 연계) -->
-              <div class="space-y-3">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <label class="block text-xs font-semibold text-slate-700">
-                      교과 편성표 업로드 (E열) <span class="text-rose-500">*</span>
-                    </label>
-                    <span class="text-[11px] text-slate-500">
-                      ※ 파일명은 학교 고유번호로 자동 생성되며, 업로드 링크가 시트 <b>E열</b>에 반영됩니다.
-                    </span>
-                  </div>
-                  
-                  <div class="flex items-center gap-2">
-                    <a href="https://drive.google.com/drive/folders/1VV99M5R7i0392maHg3qyK5GYodGoNnrf?usp=drive_link" target="_blank" class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg transition-colors">
-                      <i data-lucide="folder-symlink" class="w-3.5 h-3.5"></i>
-                      <span>지정 구글 드라이브 폴더 열기</span>
-                    </a>
-                    
-                    <div class="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-[11px] font-medium">
-                      <button type="button" id="tab-btn-file" onclick="setCurriculumMode('file')" class="px-2.5 py-1 rounded bg-white text-slate-800 shadow-2xs font-semibold">파일 첨부</button>
-                      <button type="button" id="tab-btn-url" onclick="setCurriculumMode('url')" class="px-2.5 py-1 rounded text-slate-500 hover:text-slate-800">외부 링크 입력</button>
-                    </div>
-                  </div>
+              <!-- 교과 편성표 링크 (E열) 직접 입력 (파일 업로드 기능 제거됨) -->
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <label class="block text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                    <i data-lucide="link" class="w-3.5 h-3.5 text-cyan-600"></i>
+                    <span>교과 편성표 링크 (E열)</span>
+                  </label>
+                  <a href="https://drive.google.com/drive/folders/1VV99M5R7i0392maHg3qyK5GYodGoNnrf?usp=drive_link" target="_blank" class="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 transition-colors">
+                    <i data-lucide="folder-symlink" class="w-3.5 h-3.5"></i>
+                    <span>지정 구글 드라이브 폴더 열기</span>
+                  </a>
                 </div>
-
-                <!-- 파일 드롭존 -->
-                <div id="curriculum-file-box" class="border-2 border-dashed border-slate-300 hover:border-cyan-500 rounded-2xl p-6 text-center bg-slate-50/50 transition-colors">
-                  <input type="file" id="school-file-input" onchange="onCurriculumFileSelected(event)" class="hidden" accept=".pdf,.doc,.docx,.hwp,.xls,.xlsx,.png,.jpg,.jpeg">
-                  
-                  <div id="file-empty-view" class="space-y-2 cursor-pointer" onclick="document.getElementById('school-file-input').click()">
-                    <div class="w-12 h-12 rounded-2xl bg-cyan-100/60 text-cyan-600 flex items-center justify-center mx-auto">
-                      <i data-lucide="upload-cloud" class="w-6 h-6"></i>
-                    </div>
-                    <div class="text-xs font-semibold text-slate-700">클릭하여 교과 편성표 문서를 첨부하세요</div>
-                    <p class="text-[11px] text-slate-400">PDF, HWP, Word, Excel, 이미지 등 (구글 드라이브 폴더에 학교코드로 저장됩니다)</p>
-                  </div>
-
-                  <div id="file-selected-view" class="hidden flex items-center justify-between bg-white p-3.5 rounded-xl border border-cyan-200">
-                    <div class="flex items-center space-x-3">
-                      <i data-lucide="file-text" class="w-6 h-6 text-cyan-600"></i>
-                      <div class="text-left">
-                        <div id="selected-filename" class="text-xs font-bold text-slate-900 truncate max-w-xs">curriculum.pdf</div>
-                        <div class="flex items-center gap-2 mt-0.5">
-                          <span id="selected-filesize" class="text-[10px] text-slate-400 font-mono">0 KB</span>
-                          <span class="text-[10px] text-cyan-700 bg-cyan-50 px-1.5 py-0.2 rounded font-semibold">드라이브 저장 예정명: <span id="target-upload-filename" class="font-mono">2026미입력.pdf</span></span>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <span id="upload-status-badge" class="text-[10px] font-semibold text-cyan-600 bg-cyan-50 px-2 py-1 rounded">업로드 준비됨</span>
-                      <button type="button" onclick="cancelCurriculumFile()" class="p-1 text-slate-400 hover:text-rose-500">
-                        <i data-lucide="x" class="w-4 h-4"></i>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div id="curriculum-url-box" class="hidden">
-                  <input type="url" id="school-curriculum-url" placeholder="https://drive.google.com/... 또는 웹 링크 입력" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:bg-white focus:outline-none transition-all">
-                </div>
-
-                <input type="hidden" id="final-curriculum-link" value="">
+                <input type="text" id="school-curriculum-url" placeholder="예: 구글 드라이브 링크, 학교 홈페이지 링크 또는 '링크입력예정'" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:bg-white focus:outline-none transition-all">
+                <p class="text-[11px] text-slate-400">
+                  ※ 교과 편성표 파일이 저장된 구글 드라이브 공유 링크나 웹 주소를 입력하세요. (대시보드에서 클릭 시 바로 열립니다)
+                </p>
               </div>
 
               <!-- 저장 버튼 -->
@@ -664,7 +673,7 @@
         </section>
 
         <!-- ============================================================= -->
-        <!-- [보기 탭] 학교별 정보 대시 보드 (수정된 명칭 반영) -->
+        <!-- [보기 탭] 학교별 정보 대시보드 (수정된 명칭 반영) -->
         <!-- ============================================================= -->
         <section id="tab-dashboard" class="tab-content hidden space-y-6">
 
@@ -795,7 +804,7 @@
   <!-- ================================================================= -->
   <!-- 5. 모달: 학교별 상담 상세 페이지 (Detail View Modal) -->
   <!-- ================================================================= -->
-  <div id="detail-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-200">
+  <div id="detail-modal" onclick="if(event.target === this) closeDetailModal()" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-200">
     <div class="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden transform scale-95 transition-transform duration-200" id="detail-modal-box">
       <div class="bg-slate-900 text-white p-6 flex items-start justify-between">
         <div class="flex items-center space-x-4">

@@ -85,16 +85,16 @@ function doPost(e) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheetName = "";
 
-    if (table === "schools") {
+    if (table === "schools" || table === "학교_기본정보" || table === "학교") {
       sheetName = "학교_기본정보";
-    } else if (table === "sushi") {
+    } else if (table === "sushi" || table === "수시합격_입력" || table === "수시") {
       sheetName = "수시합격_입력";
-    } else if (table === "programs") {
+    } else if (table === "programs" || table === "특별프로그램_입력" || table === "프로그램") {
       sheetName = "특별프로그램_입력";
     } else {
       return ContentService.createTextOutput(JSON.stringify({
         "success": false,
-        "error": "해당 시트는 보안상 수정할 수 없습니다."
+        "error": "해당 시트는 보안상 수정할 수 없습니다: " + table
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -107,26 +107,38 @@ function doPost(e) {
     }
 
     // -----------------------------------------------------------------
-    // 1. [신규 추가 및 이력 로그 누적]
+    // 1. [신규 추가 및 이력 로그 누적 (appendRow)]
     // -----------------------------------------------------------------
-    if (action === "add") {
+    if (action === "add" || action === "insert") {
       var newRow = [];
       var now = Utilities.formatDate(new Date(), "Asia/Seoul", "yyyy. M. d a h:mm:ss");
 
-      if (table === "schools") {
+      // 1) 학교 기본 정보 등록
+      // - A열: 학교코드(고유값)
+      // - B열: 연도
+      // - C열: 학교명
+      // - D열: 전교 학생수
+      // - E열: 링크 (교과 편성표 링크)
+      // - F열: 데이터 수집 현황
+      if (sheetName === "학교_기본정보") {
         var yearVal = String(data["연도"] || 2026);
         var schoolName = String(data["학교명"] || "");
         var schoolCode = data["학교코드(고유값)"] || (yearVal + schoolName.substring(0, 4));
+        var students = String(data["전교 학생수"] || data["전교학생수"] || "");
+        var link = data["교과 편성표(링크)"] || data["링크"] || data["교과 편성표"] || "링크입력예정";
+        var progress = data["데이터 수집 현황"] || "0 / 10";
 
         newRow = [
-          schoolCode,
-          yearVal,
-          schoolName,
-          String(data["전교 학생수"] || ""),
-          data["교과 편성표(링크)"] || "링크입력예정",
-          data["데이터 수집 현황"] || "0 / 10"
+          schoolCode, // A열
+          yearVal,    // B열: 연도
+          schoolName, // C열: 학교명
+          students,   // D열: 전교 학생수
+          link,       // E열: 링크
+          progress    // F열: 데이터 수집 현황
         ];
-      } else if (table === "sushi") {
+      } 
+      // 2) 수시 합격 데이터 등록
+      else if (sheetName === "수시합격_입력") {
         newRow = [
           now,
           data["연도"] || 2026,
@@ -138,13 +150,19 @@ function doPost(e) {
           data["내신 등급"] || "",
           data["입력자"] || ""
         ];
-      } else if (table === "programs") {
+      } 
+      // 3) 특별 프로그램 등록
+      // - D열: 프로그램 명칭
+      // - E열: 프로그램 주요 내용
+      else if (sheetName === "특별프로그램_입력") {
+        var progTitle = data["프로그램 명칭"] || data["프로그램명"] || "";
+        var progContent = data["프로그램 주요 내용"] || data["프로그램 내용"] || data["프로그램주요내용"] || data["주요 내용"] || "";
         newRow = [
           now,
           data["연도"] || 2026,
           data["학교명"] || "",
-          data["프로그램 명칭"] || "",
-          data["프로그램 주요 내용"] || "",
+          progTitle,   // D열: 프로그램 명칭
+          progContent, // E열: 프로그램 내용
           data["입력자"] || ""
         ];
       }
@@ -152,7 +170,8 @@ function doPost(e) {
       sheet.appendRow(newRow);
       return ContentService.createTextOutput(JSON.stringify({
         "success": true,
-        "message": "시트에 성공적으로 추가되었습니다."
+        "message": "시트에 성공적으로 추가되었습니다.",
+        "row": newRow
       })).setMimeType(ContentService.MimeType.JSON);
     }
 

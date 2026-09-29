@@ -1147,10 +1147,90 @@ function getSchoolAggregatedInfo(schoolName, year) {
   const normName = String(schoolName || '').trim();
   const normYear = String(year || '').trim();
 
+/**
+ * [학교 목록 통합 엔진]
+ * - '학교_기본정보' 시트뿐만 아니라, '특별프로그램_입력'이나 '수시합격_입력'에만 등록된 학교도 자동으로 취합
+ * - 등록된 모든 학교가 대시보드에 누락 없이 표시되도록 보장
+ */
+function getAllDistinctSchools() {
+  const schoolMap = new Map();
+
+  // 1. 등록된 학교 기본 정보 추가 (최신 로그 기준)
+  (state.schools || []).forEach(s => {
+    if (s._is_latest !== false) {
+      const name = String(s['학교명'] || '').trim();
+      const year = String(s['연도'] || 2026).trim();
+      if (name) {
+        schoolMap.set(`${name}_${year}`, {
+          '학교명': name,
+          '연도': year,
+          '전교 학생수': s['전교 학생수'] || '-',
+          '학교코드(고유값)': s['학교코드(고유값)'] || `${year}${name.substring(0, 4)}`,
+          '교과 편성표(링크)': s['교과 편성표(링크)'] || s['링크'] || '링크입력예정',
+          '데이터 수집 현황': s['데이터 수집 현황'] || '0 / 10',
+          '_is_latest': true
+        });
+      }
+    }
+  });
+
+  // 2. 특별 프로그램 시트에 등록된 학교 자동 보완 (학교기본정보에 아직 없더라도 표출)
+  (state.programs || []).forEach(p => {
+    const name = String(p['학교명'] || '').trim();
+    const year = String(p['연도'] || 2026).trim();
+    if (name) {
+      const key = `${name}_${year}`;
+      if (!schoolMap.has(key)) {
+        schoolMap.set(key, {
+          '학교명': name,
+          '연도': year,
+          '전교 학생수': '-',
+          '학교코드(고유값)': `${year}${name.substring(0, 4)}`,
+          '교과 편성표(링크)': '링크입력예정',
+          '데이터 수집 현황': '0 / 10',
+          '_is_latest': true
+        });
+      }
+    }
+  });
+
+  // 3. 수시 합격 시트에 등록된 학교 자동 보완
+  (state.sushi || []).forEach(s => {
+    const name = String(s['학교명'] || '').trim();
+    const year = String(s['연도'] || 2026).trim();
+    if (name) {
+      const key = `${name}_${year}`;
+      if (!schoolMap.has(key)) {
+        schoolMap.set(key, {
+          '학교명': name,
+          '연도': year,
+          '전교 학생수': '-',
+          '학교코드(고유값)': `${year}${name.substring(0, 4)}`,
+          '교과 편성표(링크)': '링크입력예정',
+          '데이터 수집 현황': '0 / 10',
+          '_is_latest': true
+        });
+      }
+    }
+  });
+
+  return Array.from(schoolMap.values());
+}
+
+/**
+ * [핵심 기능] 특정 학교 및 연도의 모든 데이터(수시 합격 + 특별 프로그램 + 대시보드 집계) 실시간 취합 엔진
+ * - D열: 프로그램 명칭, E열: 프로그램 내용을 정확히 매핑하여 요약문 및 상세 목록 생성
+ * @param {string} schoolName 학교명 (예: 'A고등학교', '야탑고등학교', '대진고등학교', '늘푸른고등학교')
+ * @param {string|number} year 학년도 (예: '2026')
+ */
+function getSchoolAggregatedInfo(schoolName, year) {
+  const normName = String(schoolName || '').trim();
+  const normYear = String(year || '').trim();
+
   // 1. 해당 학교 및 연도의 수시 합격 데이터 필터링
   const schoolSushi = (state.sushi || []).filter(s => 
-    String(s['학교명'] || '').trim() === normName &&
-    String(s['연도'] || '').trim() === normYear
+    String(s['학교명'] || '').trim().toLowerCase() === normName.toLowerCase() &&
+    (!normYear || normYear === 'ALL' || String(s['연도'] || '').trim() === normYear)
   );
 
   // 전교 등수 기준 오름차순 정렬 (1등, 2등, 3등 ...)
@@ -1160,22 +1240,21 @@ function getSchoolAggregatedInfo(schoolName, year) {
     return rankA - rankB;
   });
 
-  // 2. 해당 학교 및 연도의 특별 프로그램 데이터 필터링
+  // 2. 해당 학교 및 연도의 특별 프로그램 데이터 필터링 (D열 명칭, E열 내용)
   const schoolProgs = (state.programs || []).filter(p => 
-    String(p['학교명'] || '').trim() === normName &&
-    String(p['연도'] || '').trim() === normYear
+    String(p['학교명'] || '').trim().toLowerCase() === normName.toLowerCase() &&
+    (!normYear || normYear === 'ALL' || String(p['연도'] || '').trim() === normYear)
   );
 
   // 3. '대시보드_집계용' 시트에 수동 입력된 요약 데이터 확인
   const dashboardItem = (state.dashboard || []).find(d => 
-    String(d['학교명'] || '').trim() === normName &&
-    String(d['연도'] || '').trim() === normYear
+    String(d['학교명'] || '').trim().toLowerCase() === normName.toLowerCase() &&
+    (!normYear || normYear === 'ALL' || String(d['연도'] || '').trim() === normYear)
   );
 
   // 4. 전교 1~10등 수시 합격 종합 요약문 생성
-  let sushiSummary = dashboardItem ? String(dashboardItem['전교 1~10등 수시 합격 종합'] || '').trim() : '';
-  // 만약 시트에 수동 요약문이 없다면, 등록된 수시 합격 목록을 바탕으로 자동 취합 텍스트 생성
-  if (!sushiSummary && schoolSushi.length > 0) {
+  let sushiSummary = '';
+  if (schoolSushi.length > 0) {
     sushiSummary = schoolSushi.map(item => {
       const rank = item['전교 등수'] || '';
       const univ = item['합격 대학'] || '';
@@ -1184,22 +1263,33 @@ function getSchoolAggregatedInfo(schoolName, year) {
       const grade = item['내신 등급'] ? ` [내신 ${item['내신 등급']}]` : '';
       return `${rank} - ${univ} ${dept}${type}${grade}`.trim();
     }).join('\n');
+  } else if (dashboardItem) {
+    sushiSummary = String(dashboardItem['전교 1~10등 수시 합격 종합'] || '').trim();
   }
 
-  // 5. 진행 중인 특별 프로그램 종합 요약문 생성 (명칭 + 주요 내용 결합)
-  let progSummary = dashboardItem ? String(dashboardItem['진행 중인 특별 프로그램'] || '').trim() : '';
-  // 만약 시트에 수동 요약문이 없다면, 등록된 프로그램 목록의 명칭과 주요 내용을 결합하여 자동 취합
-  if (!progSummary && schoolProgs.length > 0) {
-    const titles = schoolProgs.map(p => {
-      const title = String(p['프로그램 명칭'] || p['프로그램명'] || '').trim();
-      const content = String(p['프로그램 주요 내용'] || p['프로그램 주요내용'] || p['주요 내용'] || '').trim();
+  // 5. 진행 중인 특별 프로그램 종합 요약문 생성 (D열 프로그램 명칭 + E열 프로그램 내용 직접 결합!)
+  let progSummary = '';
+  if (schoolProgs.length > 0) {
+    const progSummaries = schoolProgs.map(p => {
+      // D열: 프로그램 명칭
+      const title = String(p['프로그램 명칭'] || p['프로그램명'] || p['명칭'] || '').trim();
+      // E열: 프로그램 내용
+      const content = String(
+        p['프로그램 내용'] || 
+        p['프로그램 주요 내용'] || 
+        p['프로그램주요내용'] || 
+        p['주요 내용'] || 
+        p['내용'] || 
+        ''
+      ).trim();
       return content ? `${title} (${content})` : title;
     }).filter(Boolean);
-    progSummary = titles.join(' / ');
+    progSummary = progSummaries.join('  |  ');
+  } else if (dashboardItem) {
+    progSummary = String(dashboardItem['진행 중인 특별 프로그램'] || '').trim();
   }
 
   // 6. 데이터 수집 현황 및 달성률 실시간 계산
-  // 학교 기본정보에 적힌 수치와 실제 등록된 수시 데이터 건수 중 큰 값을 사용
   const realCount = schoolSushi.length;
   const target = 10; // 전교 1~10등 목표치
   const percent = Math.min(100, Math.round((realCount / target) * 100));
@@ -1223,16 +1313,17 @@ function getSchoolAggregatedInfo(schoolName, year) {
 /**
  * [대시보드 메인 렌더링]
  * - 연도 및 검색어 필터링
- * - 각 학교별 취합된 실시간 데이터(합격 종합 + 특별 프로그램 + 달성률) 표출
+ * - 각 학교별 취합된 실시간 데이터(합격 종합 + 특별 프로그램 명칭 및 내용 + 달성률) 표출
  */
 function renderDashboard() {
   try {
     const yearFilter = document.getElementById('filter-year')?.value || 'ALL';
     const keyword = (document.getElementById('filter-keyword')?.value || '').trim().toLowerCase();
 
-    // 대시보드는 최신 로그 기준으로만 표출 (_is_latest !== false)
-    const filteredSchools = (state.schools || []).filter(school => {
-      if (school._is_latest === false) return false; // 과거 이력 로그 제외
+    // 통합 학교 목록 가져오기 (학교기본정보 + 특별프로그램 + 수시합격에 등록된 모든 학교)
+    const allSchools = getAllDistinctSchools();
+
+    const filteredSchools = allSchools.filter(school => {
       const schoolYear = String(school['연도'] || '');
       const schoolName = String(school['학교명'] || '').toLowerCase();
       const matchesYear = (yearFilter === 'ALL' || schoolYear === yearFilter);
@@ -1267,7 +1358,7 @@ function renderDashboard() {
       const year = school['연도'] || 2026;
       const students = school['전교 학생수'] || '-';
 
-      // 학교별 실시간 정보 자동 취합
+      // 학교별 실시간 정보 자동 취합 (특별 프로그램 D열 명칭 + E열 내용 포함)
       const agg = getSchoolAggregatedInfo(schoolName, year);
 
       deckHtml += `
@@ -1310,16 +1401,16 @@ function renderDashboard() {
               </div>
             </div>
 
-            <!-- 취합된 특별 프로그램 내역 -->
+            <!-- 취합된 특별 프로그램 내역 (D열 명칭 + E열 내용) -->
             <div class="space-y-1.5">
               <div class="text-xs font-bold text-slate-700 flex items-center justify-between">
                 <span class="flex items-center gap-1.5">
                   <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500"></i>
-                  <span>진행 중인 특별 프로그램</span>
+                  <span>진행 중인 특별 프로그램 (명칭 및 내용)</span>
                 </span>
-                <span class="text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded font-semibold">${agg.schoolProgs.length}개 운영</span>
+                <span class="text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded font-semibold">${agg.schoolProgs.length}개 등록</span>
               </div>
-              <p class="text-xs text-slate-600 truncate bg-amber-50/60 text-amber-900 px-3 py-2 rounded-lg border border-amber-100 font-medium">
+              <p class="text-xs text-slate-700 bg-amber-50/70 text-amber-950 px-3.5 py-2.5 rounded-xl border border-amber-200/80 font-medium leading-relaxed max-h-20 overflow-hidden text-ellipsis line-clamp-2">
                 ${agg.progSummary ? escapeHtml(agg.progSummary) : '<span class="text-slate-400 font-normal">등록된 특별 프로그램이 없습니다.</span>'}
               </p>
             </div>
@@ -1338,7 +1429,7 @@ function renderDashboard() {
     deckContainer.innerHTML = deckHtml;
 
     // ===================================================================
-    // 2. 테이블 뷰 생성 (취합된 실시간 데이터 반영)
+    // 2. 테이블 뷰 생성
     // ===================================================================
     let tableHtml = '';
     filteredSchools.forEach((school, index) => {
@@ -1375,12 +1466,12 @@ function renderDashboard() {
     lucide.createIcons();
   } catch (err) {
     console.error('[대시보드 렌더링 오류]', err);
-    showToast('대시보드 화면을 불러오는 중 오류가 발생했습니다. 새로고침을 시도합니다.', 'error');
+    showToast('대시보드 화면을 불러오는 중 오류가 발생했습니다.', 'error');
   }
 }
 
 /**
- * 인덱스 기반 안전한 학교 상세 모달 호출기 (따옴표 문자열 이스케이프 오류 방지)
+ * 인덱스 기반 안전한 학교 상세 모달 호출기
  * @param {number} filteredIndex 필터링된 배열 내 인덱스
  */
 function safeOpenSchoolDetailByIndex(filteredIndex) {
@@ -1388,8 +1479,8 @@ function safeOpenSchoolDetailByIndex(filteredIndex) {
     const yearFilter = document.getElementById('filter-year')?.value || 'ALL';
     const keyword = (document.getElementById('filter-keyword')?.value || '').trim().toLowerCase();
 
-    const filteredSchools = (state.schools || []).filter(school => {
-      if (school._is_latest === false) return false;
+    const allSchools = getAllDistinctSchools();
+    const filteredSchools = allSchools.filter(school => {
       const schoolYear = String(school['연도'] || '');
       const schoolName = String(school['학교명'] || '').toLowerCase();
       const matchesYear = (yearFilter === 'ALL' || schoolYear === yearFilter);
@@ -1412,21 +1503,20 @@ function safeOpenSchoolDetailByIndex(filteredIndex) {
 
 /**
  * [상세 모달 열기]
- * - 오류 발생 시 멈춤(Freezing) 방지를 위한 강력한 try-catch 및 안전 모달 표시
- * - 실시간 취합된 수시 합격 내역 및 특별 프로그램 표시
+ * - 특별 프로그램 D열(프로그램 명칭)과 E열(프로그램 내용)을 모두 완벽하게 표출
  */
 function openSchoolDetail(schoolName, year) {
   try {
     const normName = String(schoolName || '').trim();
     const normYear = String(year || 2026).trim();
 
-    // 학교 기본 정보 찾기
-    const school = (state.schools || []).find(s => 
-      String(s['학교명'] || '').trim() === normName &&
-      String(s['연도'] || '').trim() === normYear &&
-      s._is_latest !== false
-    ) || (state.schools || []).find(s => 
-      String(s['학교명'] || '').trim() === normName
+    // 통합 학교 정보에서 검색
+    const allSchools = getAllDistinctSchools();
+    const school = allSchools.find(s => 
+      String(s['학교명'] || '').trim().toLowerCase() === normName.toLowerCase() &&
+      String(s['연도'] || '').trim() === normYear
+    ) || allSchools.find(s => 
+      String(s['학교명'] || '').trim().toLowerCase() === normName.toLowerCase()
     ) || {
       '학교명': normName,
       '연도': normYear,
@@ -1446,9 +1536,9 @@ function openSchoolDetail(schoolName, year) {
     if (nameEl) nameEl.textContent = school['학교명'] || normName;
     if (yearEl) yearEl.textContent = `${school['연도'] || normYear}학년도`;
     if (codeEl) codeEl.textContent = `학교 고유번호: ${school['학교코드(고유값)'] || '-'}`;
-    if (studentsEl) studentsEl.textContent = school['전교 학생수'] ? `${school['전교 학생수']}명` : '정보 없음';
+    if (studentsEl) studentsEl.textContent = school['전교 학생수'] && school['전교 학생수'] !== '-' ? `${school['전교 학생수']}명` : '정보 없음';
 
-    // 실시간 취합 데이터 조회
+    // 실시간 취합 데이터 조회 (D열 명칭 + E열 내용 포함)
     const agg = getSchoolAggregatedInfo(normName, normYear);
 
     // 진척도 업데이트
@@ -1461,7 +1551,7 @@ function openSchoolDetail(schoolName, year) {
     if (progBarEl) progBarEl.style.width = `${agg.progress.percent}%`;
 
     // 교과 편성표 링크 처리
-    const link = school['교과 편성표(링크)'];
+    const link = school['교과 편성표(링크)'] || school['링크'] || '';
     const linkEl = document.getElementById('modal-school-curriculum-link');
     const noneEl = document.getElementById('modal-curriculum-none');
 
@@ -1481,7 +1571,7 @@ function openSchoolDetail(schoolName, year) {
     renderModalSushiList(normName, normYear, agg);
     renderModalProgramList(normName, normYear, agg);
 
-    // 모달 표시 (인라인 CSS .modal-show 적용)
+    // 모달 표시
     const modal = document.getElementById('detail-modal');
     if (modal) {
       modal.classList.remove('hidden');
@@ -1512,7 +1602,6 @@ function closeDetailModal() {
 
 /**
  * 상세 모달 내 수시 합격 목록 렌더링
- * - 취합된 실시간 데이터(개별 합격 내역 + 종합 요약) 표시
  */
 function renderModalSushiList(schoolName, year, preAgg) {
   const container = document.getElementById('modal-sushi-list');
@@ -1564,7 +1653,7 @@ function renderModalSushiList(schoolName, year, preAgg) {
     html += '</div>';
   }
 
-  // 2. 종합 요약 박스 (자동 취합 또는 시트 집계문)
+  // 2. 종합 요약 박스
   if (rawSummaryText) {
     html += `
       <div class="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
@@ -1581,14 +1670,17 @@ function renderModalSushiList(schoolName, year, preAgg) {
 
 /**
  * 상세 모달 내 특별 프로그램 목록 렌더링
- * - 취합된 실시간 데이터(개별 프로그램 + 종합 요약) 표시
+ * - 구글 DB 시트 '특별프로그램_입력' 시트:
+ *   - D열: 프로그램 명칭
+ *   - E열: 프로그램 내용
+ * - 두 정보를 명확하고 눈에 띄게 큰 전용 카드로 완벽하게 표출
  */
 function renderModalProgramList(schoolName, year, preAgg) {
   const container = document.getElementById('modal-program-list');
   if (!container) return;
 
   const agg = preAgg || getSchoolAggregatedInfo(schoolName, year);
-  const schoolProgs = agg.schoolProgs;
+  const schoolProgs = agg.schoolProgs || [];
   const rawProgSummary = agg.progSummary;
 
   if (schoolProgs.length === 0 && !rawProgSummary) {
@@ -1604,39 +1696,61 @@ function renderModalProgramList(schoolName, year, preAgg) {
   }
 
   let html = '';
-  // 1. 개별 프로그램 카드 목록 (E열 '프로그램 주요 내용' 전용 박스 강조 표출)
+  // 1. 개별 프로그램 카드 목록 (구글 DB 시트 D열: 프로그램 명칭, E열: 프로그램 내용)
   if (schoolProgs.length > 0) {
-    html += '<div class="space-y-3">';
-    schoolProgs.forEach(prog => {
-      const title = prog['프로그램 명칭'] || prog['프로그램명'] || '프로그램';
-      // 구글 DB 시트 '특별프로그램_입력' E열(프로그램 주요 내용) 추출
+    html += '<div class="space-y-4">';
+    schoolProgs.forEach((prog, idx) => {
+      // D열: 프로그램 명칭 추출
+      const title = String(
+        prog['프로그램 명칭'] || 
+        prog['프로그램명'] || 
+        prog['명칭'] || 
+        (Object.keys(prog).length >= 4 ? Object.values(prog)[3] : '') ||
+        '프로그램'
+      ).trim();
+
+      // E열: 프로그램 내용 추출 (다양한 헤더명 및 5번째 컬럼 인덱스 완벽 대응)
       const content = String(
+        prog['프로그램 내용'] || 
         prog['프로그램 주요 내용'] || 
-        prog['프로그램 주요내용'] || 
+        prog['프로그램주요내용'] || 
         prog['주요 내용'] || 
-        prog['프로그램내용'] ||
+        prog['내용'] ||
         (Object.keys(prog).length >= 5 ? Object.values(prog)[4] : '') ||
         ''
       ).trim();
+
       const author = prog['입력자'] || '-';
+      const inputDate = prog['입력 일시'] || prog['입력일시'] || '';
 
       html += `
-        <div class="bg-amber-50/50 p-4 rounded-2xl border border-amber-200/80 space-y-2.5 shadow-2xs">
-          <div class="flex items-center justify-between">
-            <h4 class="font-bold text-slate-900 text-sm flex items-center gap-2">
-              <span class="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-xs"></span>
-              <span class="text-amber-950 font-extrabold text-base">${escapeHtml(title)}</span>
-            </h4>
-            <span class="text-[11px] text-slate-400 bg-white px-2 py-0.5 rounded border border-slate-200">입력자: ${escapeHtml(author)}</span>
+        <div class="bg-gradient-to-br from-amber-50/70 to-orange-50/40 p-4 rounded-2xl border border-amber-200 space-y-3 shadow-xs">
+          <!-- 상단: D열 프로그램 명칭 헤더 -->
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+              <span class="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-xs">
+                ${idx + 1}
+              </span>
+              <div>
+                <span class="text-[10px] font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded border border-amber-200">D열 프로그램 명칭</span>
+                <h4 class="font-extrabold text-slate-900 text-base mt-0.5">${escapeHtml(title)}</h4>
+              </div>
+            </div>
+            <div class="text-right flex-shrink-0">
+              <span class="text-[11px] text-slate-500 font-medium block">작성자: ${escapeHtml(author)}</span>
+              ${inputDate ? `<span class="text-[10px] text-slate-400 font-mono">${escapeHtml(inputDate.substring(0, 16))}</span>` : ''}
+            </div>
           </div>
-          <div class="bg-white p-3.5 rounded-xl border border-amber-100/90 space-y-1">
-            <span class="text-[11px] font-bold text-amber-800 flex items-center gap-1">
-              <i data-lucide="file-text" class="w-3.5 h-3.5 text-amber-500"></i>
-              <span>프로그램 주요 내용 (E열)</span>
-            </span>
-            <p class="text-xs text-slate-700 whitespace-pre-line leading-relaxed font-medium">
-              ${content ? escapeHtml(content) : '<span class="text-slate-400 italic">등록된 세부 내용이 없습니다.</span>'}
-            </p>
+
+          <!-- 하단: E열 프로그램 내용 (시각적으로 눈에 띄게 큰 전용 박스로 표출) -->
+          <div class="bg-white p-4 rounded-xl border border-amber-200/80 space-y-1.5 shadow-2xs">
+            <div class="flex items-center gap-1.5 text-xs font-bold text-amber-900">
+              <i data-lucide="file-text" class="w-4 h-4 text-amber-600"></i>
+              <span>E열 프로그램 내용</span>
+            </div>
+            <div class="text-xs text-slate-700 whitespace-pre-line leading-relaxed font-medium pl-1">
+              ${content ? escapeHtml(content) : '<span class="text-slate-400 italic">등록된 세부 내용이 없습니다. [특별 프로그램 입력]에서 추가하실 수 있습니다.</span>'}
+            </div>
           </div>
         </div>
       `;
