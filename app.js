@@ -292,8 +292,9 @@ async function loadData() {
       // 동기화 시간 표시
       if (syncEl) syncEl.textContent = result.data.last_synced || '방금 전';
 
-      // 통계, 리스트 및 입력 탭 자동완성 datalist 갱신
+      // 통계, 리스트, 학년도 필터 및 입력 탭 자동완성 datalist 갱신
       updateStatistics();
+      updateYearFilterOptions();
       renderSchoolList();
       updateSchoolDatalist();
     } else {
@@ -334,6 +335,47 @@ function updateStatistics() {
   if (statSchools) statSchools.innerHTML = `${distinctSchools.length}<span class="text-sm font-normal text-slate-400 ml-1">개교</span>`;
   if (statSushi) statSushi.innerHTML = `${state.sushi.length}<span class="text-sm font-normal text-slate-400 ml-1">건</span>`;
   if (statProg) statProg.innerHTML = `${state.programs.length}<span class="text-sm font-normal text-slate-400 ml-1">건</span>`;
+}
+
+/**
+ * 시트에 실제 존재하는 고유 4자리 연도 숫자 목록 추출 (내림차순 정렬)
+ */
+function extractUniqueYearsFromData() {
+  const yearSet = new Set();
+
+  const addYear = (y) => {
+    const c = cleanYear(y);
+    if (c && c.length === 4) yearSet.add(c);
+  };
+
+  state.schools.forEach(s => addYear(s['학년도'] || s['연도']));
+  state.sushi.forEach(s => addYear(s['학년도'] || s['연도']));
+  state.programs.forEach(p => addYear(p['학년도'] || p['연도']));
+
+  if (yearSet.size === 0) {
+    yearSet.add('2026');
+  }
+
+  return Array.from(yearSet).sort((a, b) => parseInt(b) - parseInt(a));
+}
+
+/**
+ * 보기 탭(대시보드) 학년도 필터 드롭다운 옵션 동적 리빌드 (숫자 전용)
+ */
+function updateYearFilterOptions() {
+  const filterSelect = document.getElementById('filter-year');
+  if (!filterSelect) return;
+
+  const currentVal = filterSelect.value || 'ALL';
+  const years = extractUniqueYearsFromData();
+
+  let optionsHtml = `<option value="ALL">전체</option>`;
+  years.forEach(y => {
+    optionsHtml += `<option value="${y}">${y}</option>`;
+  });
+
+  filterSelect.innerHTML = optionsHtml;
+  filterSelect.value = years.includes(currentVal) ? currentVal : 'ALL';
 }
 
 /**
@@ -556,7 +598,7 @@ function renderSchoolList() {
               <p class="text-xs text-[#86868B] mt-1 font-medium">전교 학생수: <b class="text-[#1D1D1F]">${data.students}</b>명</p>
             </div>
           </div>
-          <span class="text-[11px] px-2.5 py-1 rounded-full font-bold border flex-shrink-0 ${getYearBadgeColorClass(data.year)}">${data.year}</span>
+          <span class="text-[11px] px-2.5 py-1 rounded-full font-bold border flex-shrink-0 ${getYearBadgeColorClass(data.year)}">${cleanYear(data.year)}</span>
         </div>
 
         <!-- 실적 배지 요약 -->
@@ -608,7 +650,7 @@ function openSchoolModal(schoolName, year) {
   // 헤더 정보 세팅
   document.getElementById('modal-school-initial').textContent = schoolName.substring(0, 1);
   document.getElementById('modal-school-name').textContent = schoolName;
-  document.getElementById('modal-school-year').textContent = `${data.year}년`;
+  document.getElementById('modal-school-year').textContent = cleanYear(data.year);
   document.getElementById('modal-school-sub').textContent = `전교 학생수: ${data.students}명 | 여러 상담진의 입력 데이터 종합`;
   document.getElementById('modal-school-students').textContent = `${data.students} 명`;
 
