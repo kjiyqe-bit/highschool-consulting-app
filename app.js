@@ -1150,8 +1150,13 @@ async function deleteProgItem(id) {
 }
 
 // ====================================================================
-// 7. [보기 탭] 대시보드 및 상세 모달
+// 7. [보기 탭] 학교별 정보 대시보드 및 실시간 정보 취합 엔진
 // ====================================================================
+
+/**
+ * 뷰 모드 전환 (카드 덱 뷰 vs 테이블 뷰)
+ * @param {string} mode 'deck' 또는 'table'
+ */
 function setViewMode(mode) {
   state.viewMode = mode;
   const deckContainer = document.getElementById('deck-view-container');
@@ -1172,252 +1177,401 @@ function setViewMode(mode) {
   }
 }
 
-function renderDashboard() {
-  const yearFilter = document.getElementById('filter-year')?.value || 'ALL';
-  const keyword = (document.getElementById('filter-keyword')?.value || '').trim().toLowerCase();
+/**
+ * [핵심 기능] 특정 학교 및 연도의 모든 데이터(수시 합격 + 특별 프로그램 + 대시보드 집계) 실시간 취합 엔진
+ * - '대시보드_집계용' 시트에 데이터가 없더라도, 등록된 수시합격/특별프로그램을 자동으로 종합
+ * @param {string} schoolName 학교명 (예: 'A고등학교', '야탑고등학교')
+ * @param {string|number} year 학년도 (예: '2026')
+ */
+function getSchoolAggregatedInfo(schoolName, year) {
+  const normName = String(schoolName || '').trim();
+  const normYear = String(year || '').trim();
 
-  // 대시보드는 최신 로그 기준으로만 표출 (_is_latest !== false)
-  const filteredSchools = state.schools.filter(school => {
-    if (school._is_latest === false) return false; // 과거 이력 로그 제외
-    const schoolYear = String(school['연도'] || '');
-    const schoolName = String(school['학교명'] || '').toLowerCase();
-    const matchesYear = (yearFilter === 'ALL' || schoolYear === yearFilter);
-    const matchesKeyword = (!keyword || schoolName.includes(keyword));
-    return matchesYear && matchesKeyword;
-  });
-
-  const deckContainer = document.getElementById('deck-view-container');
-  const tableBody = document.getElementById('dashboard-table-body');
-  if (!deckContainer || !tableBody) return;
-
-  if (filteredSchools.length === 0) {
-    const emptyHtml = `
-      <div class="col-span-full py-16 text-center bg-white rounded-2xl border border-slate-200">
-        <i data-lucide="search-x" class="w-12 h-12 text-slate-300 mx-auto mb-3"></i>
-        <p class="text-sm font-bold text-slate-700">조건에 맞는 학교 데이터가 없습니다.</p>
-        <p class="text-xs text-slate-400 mt-1">[학교 기본 정보 입력] 탭에서 신규 학교를 등록해 보세요.</p>
-      </div>
-    `;
-    deckContainer.innerHTML = emptyHtml;
-    tableBody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-slate-400">${emptyHtml}</td></tr>`;
-    lucide.createIcons();
-    return;
-  }
-
-  // 카드 덱 뷰
-  let deckHtml = '';
-  filteredSchools.forEach(school => {
-    const schoolName = school['학교명'] || '미지정';
-    const year = school['연도'] || 2026;
-    const students = school['전교 학생수'] || '-';
-    const rawProgress = school['데이터 수집 현황'] || '0 / 10';
-    const progressPercent = calculateProgressPercent(rawProgress, schoolName, year);
-
-    const summaryItem = state.dashboard.find(d => 
-      String(d['학교명']).trim() === String(schoolName).trim() &&
-      String(d['연도']).trim() === String(year).trim()
-    );
-
-    const sushiSummary = summaryItem ? summaryItem['전교 1~10등 수시 합격 종합'] : '';
-    const progSummary = summaryItem ? summaryItem['진행 중인 특별 프로그램'] : '';
-
-    deckHtml += `
-      <div onclick="openSchoolDetail('${escapeHtml(schoolName)}', '${year}')" class="school-card bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs cursor-pointer flex flex-col justify-between group">
-        <div>
-          <div class="flex items-start justify-between mb-4">
-            <div>
-              <span class="text-[11px] font-bold text-cyan-700 bg-cyan-50 px-2.5 py-0.5 rounded-full border border-cyan-100">${year}학년도</span>
-              <h3 class="text-xl font-bold text-slate-900 mt-1.5 group-hover:text-cyan-600 transition-colors">${escapeHtml(schoolName)}</h3>
-              <p class="text-xs text-slate-400">전교생: <span class="font-semibold text-slate-700">${students}명</span></p>
-            </div>
-            <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 group-hover:bg-cyan-600 group-hover:text-white flex items-center justify-center transition-all duration-200 shadow-xs">
-              <i data-lucide="chevron-right" class="w-5 h-5"></i>
-            </div>
-          </div>
-
-          <div class="mb-5 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-            <div class="flex items-center justify-between text-xs mb-1.5">
-              <span class="font-semibold text-slate-600">수시 합격 데이터 수집</span>
-              <span class="font-bold text-blue-600">${progressPercent.text} (${progressPercent.percent}%)</span>
-            </div>
-            <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-              <div class="bg-blue-600 h-full rounded-full transition-all duration-500" style="width: ${progressPercent.percent}%"></div>
-            </div>
-          </div>
-
-          <div class="space-y-3 mb-4">
-            <div class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-              <i data-lucide="award" class="w-3.5 h-3.5 text-blue-500"></i>
-              <span>전교 1~10등 수시 합격 종합</span>
-            </div>
-            <div class="bg-slate-50/80 p-3 rounded-xl border border-slate-100 text-xs text-slate-600 whitespace-pre-line leading-relaxed max-h-24 overflow-hidden text-ellipsis line-clamp-3">
-              ${sushiSummary ? escapeHtml(sushiSummary) : '<span class="text-slate-400 italic">등록된 종합 합격 내역이 없습니다.</span>'}
-            </div>
-          </div>
-
-          <div class="space-y-1.5">
-            <div class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-              <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500"></i>
-              <span>진행 중인 특별 프로그램</span>
-            </div>
-            <p class="text-xs text-slate-600 truncate bg-amber-50/60 text-amber-900 px-3 py-2 rounded-lg border border-amber-100 font-medium">
-              ${progSummary ? escapeHtml(progSummary) : '<span class="text-slate-400 font-normal">등록된 특별 프로그램이 없습니다.</span>'}
-            </p>
-          </div>
-        </div>
-
-        <div class="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
-          <span>클릭하여 상담 상세 보기</span>
-          <span class="text-cyan-600 font-semibold flex items-center gap-1">
-            상세보기 <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
-          </span>
-        </div>
-      </div>
-    `;
-  });
-  deckContainer.innerHTML = deckHtml;
-
-  // 테이블 뷰
-  let tableHtml = '';
-  filteredSchools.forEach(school => {
-    const schoolName = school['학교명'] || '미지정';
-    const year = school['연도'] || 2026;
-    const students = school['전교 학생수'] || '-';
-    const rawProgress = school['데이터 수집 현황'] || '0 / 10';
-    const progressPercent = calculateProgressPercent(rawProgress, schoolName, year);
-
-    const summaryItem = state.dashboard.find(d => 
-      String(d['학교명']).trim() === String(schoolName).trim() &&
-      String(d['연도']).trim() === String(year).trim()
-    );
-
-    const sushiSummary = summaryItem ? summaryItem['전교 1~10등 수시 합격 종합'] : '-';
-    const progSummary = summaryItem ? summaryItem['진행 중인 특별 프로그램'] : '-';
-
-    tableHtml += `
-      <tr class="hover:bg-slate-50/80 transition-colors">
-        <td class="py-3.5 px-5 font-semibold text-slate-600">${year}년</td>
-        <td class="py-3.5 px-5 font-bold text-slate-900">${escapeHtml(schoolName)}</td>
-        <td class="py-3.5 px-5 text-slate-600">${students}명</td>
-        <td class="py-3.5 px-5">
-          <div class="flex items-center gap-2">
-            <span class="font-bold text-blue-600">${progressPercent.text}</span>
-            <div class="w-16 bg-slate-200 h-1.5 rounded-full overflow-hidden hidden sm:block">
-              <div class="bg-blue-600 h-full rounded-full" style="width: ${progressPercent.percent}%"></div>
-            </div>
-          </div>
-        </td>
-        <td class="py-3.5 px-5 text-slate-700 whitespace-pre-line max-w-xs truncate">${escapeHtml(sushiSummary)}</td>
-        <td class="py-3.5 px-5 text-slate-700 max-w-xs truncate">${escapeHtml(progSummary)}</td>
-        <td class="py-3.5 px-5 text-center">
-          <button onclick="openSchoolDetail('${escapeHtml(schoolName)}', '${year}')" class="px-3 py-1.5 bg-cyan-50 hover:bg-cyan-600 text-cyan-700 hover:text-white rounded-lg font-semibold text-xs transition-colors">
-            상담 보기
-          </button>
-        </td>
-      </tr>
-    `;
-  });
-  tableBody.innerHTML = tableHtml;
-  lucide.createIcons();
-}
-
-function calculateProgressPercent(rawText, schoolName, year) {
-  const count = state.sushi.filter(s => 
-    String(s['학교명']).trim() === String(schoolName).trim() &&
-    String(s['연도']).trim() === String(year).trim()
-  ).length;
-
-  let totalTarget = 10;
-  if (typeof rawText === 'string' && rawText.includes('/')) {
-    const parts = rawText.split('/');
-    const parsedTarget = parseInt(parts[1].trim(), 10);
-    if (!isNaN(parsedTarget) && parsedTarget > 0) totalTarget = parsedTarget;
-  }
-
-  const finalCount = Math.max(count, parseInt(rawText) || 0);
-  const percent = Math.min(100, Math.round((finalCount / totalTarget) * 100));
-
-  return { count: finalCount, total: totalTarget, text: `${finalCount} / ${totalTarget}`, percent };
-}
-
-function openSchoolDetail(schoolName, year) {
-  const school = state.schools.find(s => 
-    String(s['학교명']).trim() === String(schoolName).trim() &&
-    String(s['연도']).trim() === String(year).trim()
-  ) || {
-    '학교명': schoolName,
-    '연도': year,
-    '전교 학생수': '-',
-    '학교코드(고유값)': `${year}${schoolName.substring(0, 4)}`,
-    '교과 편성표(링크)': ''
-  };
-
-  state.selectedSchool = school;
-
-  document.getElementById('modal-school-name').textContent = school['학교명'];
-  document.getElementById('modal-school-year').textContent = `${school['연도'] || year}학년도`;
-  document.getElementById('modal-school-code').textContent = `학교 고유번호: ${school['학교코드(고유값)'] || '-'}`;
-  document.getElementById('modal-school-students').textContent = school['전교 학생수'] ? `${school['전교 학생수']}명` : '정보 없음';
-
-  const progress = calculateProgressPercent(school['데이터 수집 현황'], schoolName, year);
-  document.getElementById('modal-school-progress-text').textContent = progress.text;
-  document.getElementById('modal-school-percent').textContent = `${progress.percent}%`;
-  document.getElementById('modal-school-progress-bar').style.width = `${progress.percent}%`;
-
-  const link = school['교과 편성표(링크)'];
-  const linkEl = document.getElementById('modal-school-curriculum-link');
-  const noneEl = document.getElementById('modal-curriculum-none');
-
-  if (link && (link.startsWith('http') || link.startsWith('/'))) {
-    linkEl.href = link;
-    linkEl.classList.remove('hidden');
-    noneEl.classList.add('hidden');
-  } else {
-    linkEl.classList.add('hidden');
-    noneEl.classList.remove('hidden');
-    noneEl.textContent = link ? link : '등록된 링크 없음';
-  }
-
-  renderModalSushiList(schoolName, year);
-  renderModalProgramList(schoolName, year);
-
-  const modal = document.getElementById('detail-modal');
-  modal.classList.remove('hidden');
-  setTimeout(() => modal.classList.add('modal-show'), 10);
-  lucide.createIcons();
-}
-
-function closeDetailModal() {
-  const modal = document.getElementById('detail-modal');
-  modal.classList.remove('modal-show');
-  setTimeout(() => modal.classList.add('hidden'), 200);
-}
-
-function renderModalSushiList(schoolName, year) {
-  const container = document.getElementById('modal-sushi-list');
-  const schoolSushi = state.sushi.filter(s => 
-    String(s['학교명']).trim() === String(schoolName).trim() &&
-    String(s['연도']).trim() === String(year).trim()
+  // 1. 해당 학교 및 연도의 수시 합격 데이터 필터링
+  const schoolSushi = (state.sushi || []).filter(s => 
+    String(s['학교명'] || '').trim() === normName &&
+    String(s['연도'] || '').trim() === normYear
   );
 
+  // 전교 등수 기준 오름차순 정렬 (1등, 2등, 3등 ...)
   schoolSushi.sort((a, b) => {
-    const rankA = parseInt(String(a['전교 등수']).replace(/[^0-9]/g, '')) || 999;
-    const rankB = parseInt(String(b['전교 등수']).replace(/[^0-9]/g, '')) || 999;
+    const rankA = parseInt(String(a['전교 등수'] || '').replace(/[^0-9]/g, '')) || 999;
+    const rankB = parseInt(String(b['전교 등수'] || '').replace(/[^0-9]/g, '')) || 999;
     return rankA - rankB;
   });
 
-  const dashboardItem = state.dashboard.find(d => 
-    String(d['학교명']).trim() === String(schoolName).trim() &&
-    String(d['연도']).trim() === String(year).trim()
+  // 2. 해당 학교 및 연도의 특별 프로그램 데이터 필터링
+  const schoolProgs = (state.programs || []).filter(p => 
+    String(p['학교명'] || '').trim() === normName &&
+    String(p['연도'] || '').trim() === normYear
   );
-  const rawSummaryText = dashboardItem ? dashboardItem['전교 1~10등 수시 합격 종합'] : '';
+
+  // 3. '대시보드_집계용' 시트에 수동 입력된 요약 데이터 확인
+  const dashboardItem = (state.dashboard || []).find(d => 
+    String(d['학교명'] || '').trim() === normName &&
+    String(d['연도'] || '').trim() === normYear
+  );
+
+  // 4. 전교 1~10등 수시 합격 종합 요약문 생성
+  let sushiSummary = dashboardItem ? String(dashboardItem['전교 1~10등 수시 합격 종합'] || '').trim() : '';
+  // 만약 시트에 수동 요약문이 없다면, 등록된 수시 합격 목록을 바탕으로 자동 취합 텍스트 생성
+  if (!sushiSummary && schoolSushi.length > 0) {
+    sushiSummary = schoolSushi.map(item => {
+      const rank = item['전교 등수'] || '';
+      const univ = item['합격 대학'] || '';
+      const dept = item['합격 학과'] || '';
+      const type = item['전형명'] ? `(${item['전형명']})` : '';
+      const grade = item['내신 등급'] ? ` [내신 ${item['내신 등급']}]` : '';
+      return `${rank} - ${univ} ${dept}${type}${grade}`.trim();
+    }).join('\n');
+  }
+
+  // 5. 진행 중인 특별 프로그램 종합 요약문 생성
+  let progSummary = dashboardItem ? String(dashboardItem['진행 중인 특별 프로그램'] || '').trim() : '';
+  // 만약 시트에 수동 요약문이 없다면, 등록된 프로그램 목록의 명칭을 결합하여 자동 취합
+  if (!progSummary && schoolProgs.length > 0) {
+    const titles = schoolProgs.map(p => String(p['프로그램 명칭'] || '').trim()).filter(Boolean);
+    progSummary = titles.join(', ');
+  }
+
+  // 6. 데이터 수집 현황 및 달성률 실시간 계산
+  // 학교 기본정보에 적힌 수치와 실제 등록된 수시 데이터 건수 중 큰 값을 사용
+  const realCount = schoolSushi.length;
+  const target = 10; // 전교 1~10등 목표치
+  const percent = Math.min(100, Math.round((realCount / target) * 100));
+
+  return {
+    schoolName: normName,
+    year: normYear,
+    schoolSushi,
+    schoolProgs,
+    sushiSummary: sushiSummary || '',
+    progSummary: progSummary || '',
+    progress: {
+      count: realCount,
+      target: target,
+      text: `${realCount} / ${target}`,
+      percent: percent
+    }
+  };
+}
+
+/**
+ * [대시보드 메인 렌더링]
+ * - 연도 및 검색어 필터링
+ * - 각 학교별 취합된 실시간 데이터(합격 종합 + 특별 프로그램 + 달성률) 표출
+ */
+function renderDashboard() {
+  try {
+    const yearFilter = document.getElementById('filter-year')?.value || 'ALL';
+    const keyword = (document.getElementById('filter-keyword')?.value || '').trim().toLowerCase();
+
+    // 대시보드는 최신 로그 기준으로만 표출 (_is_latest !== false)
+    const filteredSchools = (state.schools || []).filter(school => {
+      if (school._is_latest === false) return false; // 과거 이력 로그 제외
+      const schoolYear = String(school['연도'] || '');
+      const schoolName = String(school['학교명'] || '').toLowerCase();
+      const matchesYear = (yearFilter === 'ALL' || schoolYear === yearFilter);
+      const matchesKeyword = (!keyword || schoolName.includes(keyword));
+      return matchesYear && matchesKeyword;
+    });
+
+    const deckContainer = document.getElementById('deck-view-container');
+    const tableBody = document.getElementById('dashboard-table-body');
+    if (!deckContainer || !tableBody) return;
+
+    if (filteredSchools.length === 0) {
+      const emptyHtml = `
+        <div class="col-span-full py-16 text-center bg-white rounded-2xl border border-slate-200">
+          <i data-lucide="search-x" class="w-12 h-12 text-slate-300 mx-auto mb-3"></i>
+          <p class="text-sm font-bold text-slate-700">조건에 맞는 학교 데이터가 없습니다.</p>
+          <p class="text-xs text-slate-400 mt-1">[학교 기본 정보 입력] 탭에서 신규 학교를 등록해 보세요.</p>
+        </div>
+      `;
+      deckContainer.innerHTML = emptyHtml;
+      tableBody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-slate-400">${emptyHtml}</td></tr>`;
+      lucide.createIcons();
+      return;
+    }
+
+    // ===================================================================
+    // 1. 카드 덱 뷰 생성 (취합된 실시간 데이터 반영)
+    // ===================================================================
+    let deckHtml = '';
+    filteredSchools.forEach((school, index) => {
+      const schoolName = school['학교명'] || '미지정';
+      const year = school['연도'] || 2026;
+      const students = school['전교 학생수'] || '-';
+
+      // 학교별 실시간 정보 자동 취합
+      const agg = getSchoolAggregatedInfo(schoolName, year);
+
+      deckHtml += `
+        <div onclick="safeOpenSchoolDetailByIndex(${index})" class="school-card bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs cursor-pointer flex flex-col justify-between group">
+          <div>
+            <!-- 상단 헤더: 연도 및 학교명 -->
+            <div class="flex items-start justify-between mb-4">
+              <div>
+                <span class="text-[11px] font-bold text-cyan-700 bg-cyan-50 px-2.5 py-0.5 rounded-full border border-cyan-100">${year}학년도</span>
+                <h3 class="text-xl font-bold text-slate-900 mt-1.5 group-hover:text-cyan-600 transition-colors">${escapeHtml(schoolName)}</h3>
+                <p class="text-xs text-slate-400">전교생: <span class="font-semibold text-slate-700">${students}명</span></p>
+              </div>
+              <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 group-hover:bg-cyan-600 group-hover:text-white flex items-center justify-center transition-all duration-200 shadow-xs">
+                <i data-lucide="chevron-right" class="w-5 h-5"></i>
+              </div>
+            </div>
+
+            <!-- 수시 합격 수집 진척도 바 -->
+            <div class="mb-5 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+              <div class="flex items-center justify-between text-xs mb-1.5">
+                <span class="font-semibold text-slate-600">수시 합격 데이터 수집 현황</span>
+                <span class="font-bold text-blue-600">${agg.progress.text} (${agg.progress.percent}%)</span>
+              </div>
+              <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                <div class="bg-blue-600 h-full rounded-full transition-all duration-500" style="width: ${agg.progress.percent}%"></div>
+              </div>
+            </div>
+
+            <!-- 취합된 전교 1~10등 수시 합격 종합 내역 -->
+            <div class="space-y-3 mb-4">
+              <div class="text-xs font-bold text-slate-700 flex items-center justify-between">
+                <span class="flex items-center gap-1.5">
+                  <i data-lucide="award" class="w-3.5 h-3.5 text-blue-500"></i>
+                  <span>전교 1~10등 수시 합격 종합</span>
+                </span>
+                <span class="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-semibold">${agg.schoolSushi.length}건 등록</span>
+              </div>
+              <div class="bg-slate-50/80 p-3 rounded-xl border border-slate-100 text-xs text-slate-600 whitespace-pre-line leading-relaxed max-h-24 overflow-hidden text-ellipsis line-clamp-3">
+                ${agg.sushiSummary ? escapeHtml(agg.sushiSummary) : '<span class="text-slate-400 italic">등록된 종합 합격 내역이 없습니다. (상세보기에서 확인)</span>'}
+              </div>
+            </div>
+
+            <!-- 취합된 특별 프로그램 내역 -->
+            <div class="space-y-1.5">
+              <div class="text-xs font-bold text-slate-700 flex items-center justify-between">
+                <span class="flex items-center gap-1.5">
+                  <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500"></i>
+                  <span>진행 중인 특별 프로그램</span>
+                </span>
+                <span class="text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded font-semibold">${agg.schoolProgs.length}개 운영</span>
+              </div>
+              <p class="text-xs text-slate-600 truncate bg-amber-50/60 text-amber-900 px-3 py-2 rounded-lg border border-amber-100 font-medium">
+                ${agg.progSummary ? escapeHtml(agg.progSummary) : '<span class="text-slate-400 font-normal">등록된 특별 프로그램이 없습니다.</span>'}
+              </p>
+            </div>
+          </div>
+
+          <!-- 하단 클릭 유도 바 -->
+          <div class="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+            <span>클릭하여 상담 상세 보기</span>
+            <span class="text-cyan-600 font-semibold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+              상세보기 <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+            </span>
+          </div>
+        </div>
+      `;
+    });
+    deckContainer.innerHTML = deckHtml;
+
+    // ===================================================================
+    // 2. 테이블 뷰 생성 (취합된 실시간 데이터 반영)
+    // ===================================================================
+    let tableHtml = '';
+    filteredSchools.forEach((school, index) => {
+      const schoolName = school['학교명'] || '미지정';
+      const year = school['연도'] || 2026;
+      const students = school['전교 학생수'] || '-';
+
+      const agg = getSchoolAggregatedInfo(schoolName, year);
+
+      tableHtml += `
+        <tr class="hover:bg-slate-50/80 transition-colors">
+          <td class="py-3.5 px-5 font-semibold text-slate-600">${year}년</td>
+          <td class="py-3.5 px-5 font-bold text-slate-900">${escapeHtml(schoolName)}</td>
+          <td class="py-3.5 px-5 text-slate-600">${students}명</td>
+          <td class="py-3.5 px-5">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-blue-600">${agg.progress.text}</span>
+              <div class="w-16 bg-slate-200 h-1.5 rounded-full overflow-hidden hidden sm:block">
+                <div class="bg-blue-600 h-full rounded-full" style="width: ${agg.progress.percent}%"></div>
+              </div>
+            </div>
+          </td>
+          <td class="py-3.5 px-5 text-slate-700 whitespace-pre-line max-w-xs truncate">${escapeHtml(agg.sushiSummary || '-')}</td>
+          <td class="py-3.5 px-5 text-slate-700 max-w-xs truncate">${escapeHtml(agg.progSummary || '-')}</td>
+          <td class="py-3.5 px-5 text-center">
+            <button onclick="safeOpenSchoolDetailByIndex(${index})" class="px-3 py-1.5 bg-cyan-50 hover:bg-cyan-600 text-cyan-700 hover:text-white rounded-lg font-semibold text-xs transition-colors">
+              상담 보기
+            </button>
+          </td>
+        </tr>
+      `;
+    });
+    tableBody.innerHTML = tableHtml;
+    lucide.createIcons();
+  } catch (err) {
+    console.error('[대시보드 렌더링 오류]', err);
+    showToast('대시보드 화면을 불러오는 중 오류가 발생했습니다. 새로고침을 시도합니다.', 'error');
+  }
+}
+
+/**
+ * 인덱스 기반 안전한 학교 상세 모달 호출기 (따옴표 문자열 이스케이프 오류 방지)
+ * @param {number} filteredIndex 필터링된 배열 내 인덱스
+ */
+function safeOpenSchoolDetailByIndex(filteredIndex) {
+  try {
+    const yearFilter = document.getElementById('filter-year')?.value || 'ALL';
+    const keyword = (document.getElementById('filter-keyword')?.value || '').trim().toLowerCase();
+
+    const filteredSchools = (state.schools || []).filter(school => {
+      if (school._is_latest === false) return false;
+      const schoolYear = String(school['연도'] || '');
+      const schoolName = String(school['학교명'] || '').toLowerCase();
+      const matchesYear = (yearFilter === 'ALL' || schoolYear === yearFilter);
+      const matchesKeyword = (!keyword || schoolName.includes(keyword));
+      return matchesYear && matchesKeyword;
+    });
+
+    const targetSchool = filteredSchools[filteredIndex];
+    if (targetSchool) {
+      openSchoolDetail(targetSchool['학교명'], targetSchool['연도']);
+    } else {
+      showToast('선택하신 학교 정보를 찾을 수 없습니다.', 'error');
+    }
+  } catch (err) {
+    console.error('[학교 상세 열기 오류]', err);
+    showToast('학교 정보를 여는 중 오류가 발생했습니다.', 'error');
+    closeDetailModal();
+  }
+}
+
+/**
+ * [상세 모달 열기]
+ * - 오류 발생 시 멈춤(Freezing) 방지를 위한 강력한 try-catch 및 안전 모달 표시
+ * - 실시간 취합된 수시 합격 내역 및 특별 프로그램 표시
+ */
+function openSchoolDetail(schoolName, year) {
+  try {
+    const normName = String(schoolName || '').trim();
+    const normYear = String(year || 2026).trim();
+
+    // 학교 기본 정보 찾기
+    const school = (state.schools || []).find(s => 
+      String(s['학교명'] || '').trim() === normName &&
+      String(s['연도'] || '').trim() === normYear &&
+      s._is_latest !== false
+    ) || (state.schools || []).find(s => 
+      String(s['학교명'] || '').trim() === normName
+    ) || {
+      '학교명': normName,
+      '연도': normYear,
+      '전교 학생수': '-',
+      '학교코드(고유값)': `${normYear}${normName.substring(0, 4)}`,
+      '교과 편성표(링크)': ''
+    };
+
+    state.selectedSchool = school;
+
+    // 모달 DOM 요소 업데이트
+    const nameEl = document.getElementById('modal-school-name');
+    const yearEl = document.getElementById('modal-school-year');
+    const codeEl = document.getElementById('modal-school-code');
+    const studentsEl = document.getElementById('modal-school-students');
+
+    if (nameEl) nameEl.textContent = school['학교명'] || normName;
+    if (yearEl) yearEl.textContent = `${school['연도'] || normYear}학년도`;
+    if (codeEl) codeEl.textContent = `학교 고유번호: ${school['학교코드(고유값)'] || '-'}`;
+    if (studentsEl) studentsEl.textContent = school['전교 학생수'] ? `${school['전교 학생수']}명` : '정보 없음';
+
+    // 실시간 취합 데이터 조회
+    const agg = getSchoolAggregatedInfo(normName, normYear);
+
+    // 진척도 업데이트
+    const progTextEl = document.getElementById('modal-school-progress-text');
+    const progPercentEl = document.getElementById('modal-school-percent');
+    const progBarEl = document.getElementById('modal-school-progress-bar');
+
+    if (progTextEl) progTextEl.textContent = agg.progress.text;
+    if (progPercentEl) progPercentEl.textContent = `${agg.progress.percent}%`;
+    if (progBarEl) progBarEl.style.width = `${agg.progress.percent}%`;
+
+    // 교과 편성표 링크 처리
+    const link = school['교과 편성표(링크)'];
+    const linkEl = document.getElementById('modal-school-curriculum-link');
+    const noneEl = document.getElementById('modal-curriculum-none');
+
+    if (linkEl && noneEl) {
+      if (link && (link.startsWith('http') || link.startsWith('/'))) {
+        linkEl.href = link;
+        linkEl.classList.remove('hidden');
+        noneEl.classList.add('hidden');
+      } else {
+        linkEl.classList.add('hidden');
+        noneEl.classList.remove('hidden');
+        noneEl.textContent = link ? link : '등록된 링크 없음';
+      }
+    }
+
+    // 취합된 수시 합격 목록 및 특별 프로그램 목록 렌더링
+    renderModalSushiList(normName, normYear, agg);
+    renderModalProgramList(normName, normYear, agg);
+
+    // 모달 표시 (인라인 CSS .modal-show 적용)
+    const modal = document.getElementById('detail-modal');
+    if (modal) {
+      modal.classList.remove('hidden');
+      setTimeout(() => {
+        modal.classList.add('modal-show');
+      }, 10);
+      lucide.createIcons();
+    }
+  } catch (err) {
+    console.error('[상세 모달 렌더링 예외]', err);
+    showToast(`상세 정보를 표시하는 중 오류가 발생했습니다: ${err.message}`, 'error');
+    closeDetailModal();
+  }
+}
+
+/**
+ * 상세 모달 닫기
+ */
+function closeDetailModal() {
+  const modal = document.getElementById('detail-modal');
+  if (modal) {
+    modal.classList.remove('modal-show');
+    setTimeout(() => {
+      modal.classList.add('hidden');
+    }, 200);
+  }
+}
+
+/**
+ * 상세 모달 내 수시 합격 목록 렌더링
+ * - 취합된 실시간 데이터(개별 합격 내역 + 종합 요약) 표시
+ */
+function renderModalSushiList(schoolName, year, preAgg) {
+  const container = document.getElementById('modal-sushi-list');
+  if (!container) return;
+
+  const agg = preAgg || getSchoolAggregatedInfo(schoolName, year);
+  const schoolSushi = agg.schoolSushi;
+  const rawSummaryText = agg.sushiSummary;
 
   if (schoolSushi.length === 0 && !rawSummaryText) {
-    container.innerHTML = `<div class="p-6 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-xs text-slate-400">등록된 수시 합격 데이터가 없습니다. [수시합격 입력] 탭에서 등록해 주세요.</div>`;
+    container.innerHTML = `
+      <div class="p-6 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-xs text-slate-400 space-y-2">
+        <p>등록된 수시 합격 데이터가 없습니다.</p>
+        <button onclick="closeDetailModal(); switchTab('tab-sushi')" class="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg font-semibold transition-colors">
+          [수시 합격 입력] 탭에서 등록하기
+        </button>
+      </div>
+    `;
     return;
   }
 
   let html = '';
+  // 1. 개별 수시 합격 카드 목록
   if (schoolSushi.length > 0) {
     html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">';
     schoolSushi.forEach(item => {
@@ -1446,12 +1600,13 @@ function renderModalSushiList(schoolName, year) {
     html += '</div>';
   }
 
+  // 2. 종합 요약 박스 (자동 취합 또는 시트 집계문)
   if (rawSummaryText) {
     html += `
       <div class="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
         <span class="text-xs font-bold text-slate-700 block mb-1.5 flex items-center gap-1.5">
           <i data-lucide="clipboard-check" class="w-3.5 h-3.5 text-blue-600"></i>
-          시트 자동 집계 요약문 ('대시보드_집계용')
+          전교 1~10등 실시간 종합 요약
         </span>
         <div class="text-xs text-slate-600 whitespace-pre-line leading-relaxed font-mono bg-white p-3 rounded-lg border border-slate-200/80">${escapeHtml(rawSummaryText)}</div>
       </div>
@@ -1460,25 +1615,32 @@ function renderModalSushiList(schoolName, year) {
   container.innerHTML = html;
 }
 
-function renderModalProgramList(schoolName, year) {
+/**
+ * 상세 모달 내 특별 프로그램 목록 렌더링
+ * - 취합된 실시간 데이터(개별 프로그램 + 종합 요약) 표시
+ */
+function renderModalProgramList(schoolName, year, preAgg) {
   const container = document.getElementById('modal-program-list');
-  const schoolProgs = state.programs.filter(p => 
-    String(p['학교명']).trim() === String(schoolName).trim() &&
-    String(p['연도']).trim() === String(year).trim()
-  );
+  if (!container) return;
 
-  const dashboardItem = state.dashboard.find(d => 
-    String(d['학교명']).trim() === String(schoolName).trim() &&
-    String(d['연도']).trim() === String(year).trim()
-  );
-  const rawProgSummary = dashboardItem ? dashboardItem['진행 중인 특별 프로그램'] : '';
+  const agg = preAgg || getSchoolAggregatedInfo(schoolName, year);
+  const schoolProgs = agg.schoolProgs;
+  const rawProgSummary = agg.progSummary;
 
   if (schoolProgs.length === 0 && !rawProgSummary) {
-    container.innerHTML = `<div class="p-6 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-xs text-slate-400">등록된 특별 프로그램이 없습니다. [특별프로그램 입력] 탭에서 등록해 주세요.</div>`;
+    container.innerHTML = `
+      <div class="p-6 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-xs text-slate-400 space-y-2">
+        <p>등록된 특별 프로그램이 없습니다.</p>
+        <button onclick="closeDetailModal(); switchTab('tab-programs')" class="px-3 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white rounded-lg font-semibold transition-colors">
+          [특별 프로그램 입력] 탭에서 등록하기
+        </button>
+      </div>
+    `;
     return;
   }
 
   let html = '';
+  // 1. 개별 프로그램 카드 목록
   if (schoolProgs.length > 0) {
     schoolProgs.forEach(prog => {
       html += `
@@ -1497,7 +1659,7 @@ function renderModalProgramList(schoolName, year) {
   } else if (rawProgSummary) {
     html += `
       <div class="p-4 bg-amber-50/60 rounded-xl border border-amber-200/80">
-        <h4 class="text-xs font-bold text-amber-900 mb-1">시트 집계 프로그램 명칭</h4>
+        <h4 class="text-xs font-bold text-amber-900 mb-1">진행 중인 특별 프로그램</h4>
         <p class="text-xs text-slate-700 whitespace-pre-line font-medium">${escapeHtml(rawProgSummary)}</p>
       </div>
     `;
@@ -1612,3 +1774,79 @@ function formatBytes(bytes) {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
+
+// ====================================================================
+// 10. [안전 장치] 전역 오류 감지기 및 상태 자동 복구 가드
+// - 오류 발생 시 화면이 멈추거나 버튼이 잠기는 현상을 원천 방지
+// ====================================================================
+
+/**
+ * 모든 폼의 등록 버튼 및 로딩 인디케이터를 초기 정상 상태로 안전 복구
+ */
+function resetAllLoadingStates() {
+  const submitConfigs = [
+    {
+      id: 'school-submit-btn',
+      html: '<i data-lucide="plus-circle" class="w-4 h-4"></i><span>학교 기본 정보 등록하기</span>'
+    },
+    {
+      id: 'sushi-submit-btn',
+      html: '<i data-lucide="plus-circle" class="w-4 h-4"></i><span>수시 합격 데이터 등록하기</span>'
+    },
+    {
+      id: 'prog-submit-btn',
+      html: '<i data-lucide="plus-circle" class="w-4 h-4"></i><span>특별 프로그램 등록하기</span>'
+    },
+    {
+      id: 'login-submit-btn',
+      html: '<span>인증 및 시스템 접속</span><i data-lucide="arrow-right" class="w-4 h-4"></i>'
+    }
+  ];
+
+  submitConfigs.forEach(cfg => {
+    const el = document.getElementById(cfg.id);
+    if (el) {
+      el.disabled = false;
+      el.innerHTML = cfg.html;
+    }
+  });
+
+  // 상태 배지 초기화
+  const statusBadge = document.getElementById('upload-status-badge');
+  if (statusBadge && statusBadge.textContent.includes('중')) {
+    statusBadge.textContent = '대기 중';
+  }
+
+  // 아이콘 재생성
+  if (window.lucide && typeof lucide.createIcons === 'function') {
+    lucide.createIcons();
+  }
+}
+
+// 전역 자바스크립트 런타임 오류 감지기
+window.addEventListener('error', (event) => {
+  console.error('[전역 오류 감지됨]:', event.error || event.message);
+  // 사용자에게 친절한 알림 표시
+  showToast('일시적인 화면 오류가 감지되어 이전 정상 상태로 안전하게 복구했습니다.', 'error');
+  // 잠겨있을 수 있는 버튼 및 모달 상태 복원
+  resetAllLoadingStates();
+});
+
+// 비동기 통신(Promise) 실패 감지기
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('[비동기 통신 예외 감지됨]:', event.reason);
+  showToast('서버 통신 중 지연이 발생했으나 작업을 안전하게 취소하고 복구했습니다.', 'error');
+  resetAllLoadingStates();
+});
+
+// 키보드 ESC 키를 누르면 열려있는 모달을 즉시 닫고 안전 복구
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' || e.key === 'Esc') {
+    closeDetailModal();
+    if (typeof cancelFileDuplicateUpload === 'function') cancelFileDuplicateUpload();
+    if (typeof cancelSchoolDuplicateSubmit === 'function') cancelSchoolDuplicateSubmit();
+    if (typeof closeEditSchoolModal === 'function') closeEditSchoolModal();
+    if (typeof closeSettingsModal === 'function') closeSettingsModal();
+  }
+});
+

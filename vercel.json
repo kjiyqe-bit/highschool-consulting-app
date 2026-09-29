@@ -10,6 +10,10 @@
       "dest": "/app.js"
     },
     {
+      "src": "/style.css",
+      "dest": "/style.css"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }

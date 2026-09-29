@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>고교 수시 합격 및 학교별 정보 대시 보드</title>
+  <title>고교 수시 합격 및 학교별 정보 대시보드</title>
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -17,6 +17,61 @@
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="style.css">
+  <style>
+    /* ====================================================================
+       모달 팝업 및 핵심 상호작용 스타일 (인라인 내장으로 404 방지)
+       ==================================================================== */
+    body {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    .nav-item.active {
+      background-color: #1e293b;
+      color: #ffffff;
+      border-left: 3px solid #3b82f6;
+    }
+    .mob-nav-item.active {
+      color: #2563eb;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    /* 모달 표시 핵심 클래스 - 이것이 누락되면 투명한 상태로 화면이 굳어버림 */
+    .modal-show {
+      opacity: 1 !important;
+      pointer-events: auto !important;
+    }
+    .modal-show #detail-modal-box,
+    .modal-show .transform {
+      transform: scale(1) !important;
+    }
+    .school-card {
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+    .school-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+      border-color: #93c5fd;
+    }
+    @keyframes toastIn {
+      from { transform: translateY(-20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .toast-animate {
+      animation: toastIn 0.25s ease-out forwards;
+    }
+  </style>
   <script>
     tailwind.config = {
       theme: {
@@ -180,11 +235,11 @@
 
           <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 mt-6 mb-2">상담 전용 뷰어</div>
           
-          <!-- [보기 탭] 학교별 정보 대시 보드 (수정됨) -->
+          <!-- [보기 탭] 학교별 정보 대시보드 (수정됨) -->
           <button onclick="switchTab('tab-dashboard')" id="nav-tab-dashboard" class="nav-item w-full flex items-center justify-between px-3.5 py-3 rounded-xl font-medium text-sm transition-all duration-200 hover:bg-slate-800 hover:text-white group">
             <div class="flex items-center space-x-3">
               <i data-lucide="layout-dashboard" class="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform"></i>
-              <span>학교별 정보 대시 보드</span>
+              <span>학교별 정보 대시보드</span>
             </div>
             <span class="text-[10px] bg-emerald-900/60 text-emerald-300 px-2 py-0.5 rounded-full font-bold">View</span>
           </button>
@@ -664,7 +719,7 @@
         </section>
 
         <!-- ============================================================= -->
-        <!-- [보기 탭] 학교별 정보 대시 보드 (수정된 명칭 반영) -->
+        <!-- [보기 탭] 학교별 정보 대시보드 (수정된 명칭 반영) -->
         <!-- ============================================================= -->
         <section id="tab-dashboard" class="tab-content hidden space-y-6">
 
@@ -795,7 +850,7 @@
   <!-- ================================================================= -->
   <!-- 5. 모달: 학교별 상담 상세 페이지 (Detail View Modal) -->
   <!-- ================================================================= -->
-  <div id="detail-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-200">
+  <div id="detail-modal" onclick="if(event.target === this) closeDetailModal()" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-200">
     <div class="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden transform scale-95 transition-transform duration-200" id="detail-modal-box">
       <div class="bg-slate-900 text-white p-6 flex items-start justify-between">
         <div class="flex items-center space-x-4">
