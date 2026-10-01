@@ -456,9 +456,9 @@ class handler(http.server.BaseHTTPRequestHandler):
             timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             year = str(body.get("학년도", body.get("연도", "2026학년도"))).strip()
             name = str(body.get("학교명", "")).strip()
-            students = str(body.get("학생 수", body.get("학생수", body.get("전교 학생수", body.get("전교학생수", body.get("studentCount", "")))))) .strip()
+            students = str(body.get("학생 수", body.get("학생수", body.get("전교 학생수", body.get("전교학생수", body.get("studentCount", "")))))).strip()
             school_type = str(body.get("학교 유형", body.get("학교유형", "일반고"))).strip()
-            link = str(body.get("교과 편성표(링크)", body.get("교과편성표(링크)", body.get("링크", "")))).strip() or "링크입력예정"
+            link = str(body.get("교과 편성표(링크)", body.get("교과편성표", body.get("드라이브링크", body.get("링크", ""))))).strip()
 
             if not name:
                 self.send_json(400, {"success": False, "error": "학교명을 입력해 주세요."})
@@ -466,27 +466,28 @@ class handler(http.server.BaseHTTPRequestHandler):
 
             prefix = name[:4] if len(name) >= 4 else name
             clean_year_num = re.sub(r"[^0-9]", "", year)
-            school_code = f"{clean_year_num}{prefix}"
+            school_code = str(body.get("학교 코드", body.get("학교코드", f"{clean_year_num}{prefix}"))).strip()
 
             new_record = {
                 "입력 시간": timestamp,
+                "학교 코드": school_code,
                 "학교 코드(고유값)": school_code,
                 "학년도": year,
                 "학교명": name,
                 "학생 수": students,
                 "학생수": students,
-                "전교 학생수": students,
-                "전교학생수": students,
-                "studentCount": students,
                 "학교 유형": school_type,
+                "학교유형": school_type,
+                "교과 편성표": link,
                 "교과 편성표(링크)": link,
+                "드라이브링크": link,
                 "링크": link
             }
 
             gas_res = sync_to_apps_script("add", "schools", new_record)
             self.send_json(200, {
                 "success": True,
-                "message": f"'{name}' ({year}) 학교 정보가 성공적으로 등록되었습니다.",
+                "message": f"'{name}' 학교 기본 정보가 '학교_기본정보' 시트(A~E열)에 성공적으로 등록되었습니다.",
                 "item": new_record,
                 "gas_res": gas_res
             })

@@ -955,7 +955,7 @@ async function handleProgramSubmit(event) {
 }
 
 /**
- * 3) 학교 기본 정보 제출
+ * 3) 학교 기본 정보 제출 ('학교_기본정보' 시트 A~E열 매핑)
  */
 async function handleSchoolSubmit(event) {
   event.preventDefault();
@@ -978,31 +978,46 @@ async function handleSchoolSubmit(event) {
     return;
   }
 
+  // 학교 코드 자동 생성 (예: 2026 + 야탑고 -> 2026야탑고)
+  const prefix = name.length >= 4 ? name.substring(0, 4) : name;
+  const cleanYearNum = year.replace(/[^0-9]/g, '');
+  const schoolCode = `${cleanYearNum}${prefix}`;
+
+  // 비동기 요청 중 로딩 인디케이터 표시
   btn.disabled = true;
-  btn.innerHTML = `<span class="animate-pulse">구글 시트에 저장 중...</span>`;
+  btn.innerHTML = `<span class="animate-pulse flex items-center justify-center gap-2"><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>구글 시트 '학교_기본정보'에 저장 중...</span></span>`;
+  if (window.lucide) lucide.createIcons();
 
   try {
+    const payload = {
+      '입력 시간': new Date().toISOString().replace('T', ' ').substring(0, 19),
+      '학교 코드': schoolCode,
+      '학교 코드(고유값)': schoolCode,
+      '학년도': year,
+      '연도': year,
+      '학교명': name,
+      '학생 수': students,
+      '학생수': students,
+      '전교 학생수': students,
+      '전교학생수': students,
+      'studentCount': students,
+      '학교 유형': schoolType,
+      '학교유형': schoolType,
+      '교과 편성표(링크)': link,
+      '교과편성표': link,
+      '드라이브링크': link,
+      '링크': link
+    };
+
     const res = await fetch('/api/schools', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        '학년도': year,
-        '연도': year,
-        '학교명': name,
-        '학생 수': students,
-        '학생수': students,
-        '전교 학생수': students,
-        '전교학생수': students,
-        'studentCount': students,
-        '학교 유형': schoolType,
-        '교과 편성표(링크)': link,
-        '링크': link
-      })
+      body: JSON.stringify(payload)
     });
 
     const result = await res.json();
     if (result.success) {
-      showToast(`'${name}' (${year}) 학교 정보가 성공적으로 저장되었습니다!`, 'success');
+      showToast(`'${name}' 학교 기본 정보(A~E열)가 구글 시트에 성공적으로 저장되었습니다!`, 'success');
       if (studentsInput) studentsInput.value = '';
       if (linkInput) linkInput.value = '';
       await loadData();

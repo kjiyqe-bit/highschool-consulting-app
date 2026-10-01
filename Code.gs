@@ -1,35 +1,44 @@
 /**
  * ===========================================================================
  * 인근 고등학교 수시 합격 데이터베이스 (상담용) - Google Apps Script 백엔드 웹앱
- * 파일: Code.gs (v22 - 학교 유형, 학생 수 완전 호환 및 doGet 데이터 반환 지원)
+ * 파일: Code.gs (v24 - '학교_기본정보' A~E열 컬럼 매핑 완벽 적용)
  * ===========================================================================
  * [구글 시트 탭별 표준 구조 및 컬럼 배치]
- * 1. '학교_기본 정보': A열 입력 일시, B열 학교 코드(고유값), C열 학년도, D열 학교명, E열 학생 수, F열 학교 유형, G열 교과 편성표(링크)
- * 2. '수시합격_입력': A열 입력 일시, B열 학년도, C열 학교명, D열 전교 등수, E열 합격 대학, F열 합격 학과, G열 전형명, H열 내신 등급, I열 입력자
- * 3. '특별프로그램_입력': A열 입력 일시, B열 학년도, C열 학교명, D열 프로그램 명칭, E열 프로그램 주요 내용, F열 입력자
+ * 1. '학교_기본정보' (A~E열 5개 컬럼 표준):
+ *    - A열: 입력한 시간 (타임스탬프, YYYY-MM-DD HH:mm:ss)
+ *    - B열: 학교 코드 (예: 2026야탑고)
+ *    - C열: 학생 수 (예: 350)
+ *    - D열: 학교 유형 (선택값: 일반고, 자사고, 특목고 등)
+ *    - E열: 교과 편성표 드라이브 링크 (URL 텍스트)
+ *
+ * 2. '수시합격_입력' (A~I열 9개 컬럼 표준):
+ *    - A열: 입력 일시, B열: 학년도, C열: 학교명, D열: 전교 등수, E열: 합격 대학, F열: 합격 학과, G열: 전형명, H열: 내신 등급, I열: 입력자
+ *
+ * 3. '특별프로그램_입력' (A~F열 6개 컬럼 표준):
+ *    - A열: 입력 일시, B열: 학년도, C열: 학교명, D열: 프로그램 명칭, E열: 프로그램 주요 내용, F열: 입력자
  * ===========================================================================
  */
 
-// 1. HTTP GET 요청 처리 (시트 데이터 조회)
+// 1. HTTP GET 요청 처리 (웹앱에서 전체 시트 데이터를 조회할 때 호출)
 function doGet(e) {
   var response = { success: true, schools: [], sushi: [], programs: [] };
   
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     
-    // (1) 학교_기본 정보 읽기
-    var schoolSheet = getSheetByName(ss, ["학교_기본 정보", "학교_기본정보", "학교기본정보", "학교"]);
+    // (1) '학교_기본정보' 시트 데이터 읽기
+    var schoolSheet = getSheetByName(ss, ["학교_기본정보", "학교_기본 정보", "학교기본정보", "학교"]);
     if (schoolSheet) {
       response.schools = getSheetDataAsObjects(schoolSheet);
     }
     
-    // (2) 수시합격_입력 읽기
+    // (2) '수시합격_입력' 시트 데이터 읽기
     var sushiSheet = getSheetByName(ss, ["수시합격_입력", "수시합격", "수시"]);
     if (sushiSheet) {
       response.sushi = getSheetDataAsObjects(sushiSheet);
     }
     
-    // (3) 특별프로그램_입력 읽기
+    // (3) '특별프로그램_입력' 시트 데이터 읽기
     var programSheet = getSheetByName(ss, ["특별프로그램_입력", "특별프로그램", "프로그램"]);
     if (programSheet) {
       response.programs = getSheetDataAsObjects(programSheet);
@@ -44,7 +53,7 @@ function doGet(e) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-// 2. HTTP POST 요청 처리 (신규 데이터 입력/저장)
+// 2. HTTP POST 요청 처리 (신규 데이터 저장)
 function doPost(e) {
   var response = { success: false, message: "" };
   
@@ -55,65 +64,18 @@ function doPost(e) {
     var table = data.table;
     var rowData = data.data || {};
     
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    // 학교 기본 정보 저장 요청 처리 ('schools' 또는 direct 매핑)
+    if (table === "schools") {
+      var result = saveSchoolBasicInfo(rowData);
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
     
-    // 한국 표준시 (Asia/Seoul) 타임스탬프 생성
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
     var currentTimestamp = Utilities.formatDate(new Date(), "Asia/Seoul", "yyyy-MM-dd HH:mm:ss");
     
-    // -----------------------------------------------------------------------
-    // A. 학교 기본 정보 등록 ('schools')
-    // -----------------------------------------------------------------------
-    if (table === "schools") {
-      var sheet = getSheetByName(ss, ["학교_기본 정보", "학교_기본정보", "학교기본정보", "학교"]);
-      if (!sheet) throw new Error("'학교_기본 정보' 시트를 찾을 수 없습니다.");
-      
-      var timestamp = rowData["입력 시간"] || rowData["입력일시"] || currentTimestamp;
-      var rawYear = rowData["학년도"] || rowData["연도"] || "2026";
-      var year = String(rawYear).replace(/[^0-9]/g, "");
-      var name = rowData["학교명"] || "";
-      // 학생 수 다양한 헤더 명칭 호환 체크
-      var students = rowData["학생 수"] || rowData["학생수"] || rowData["전교 학생수"] || rowData["전교학생수"] || rowData["studentCount"] || "";
-      // 학교 유형 다양한 헤더 명칭 호환 체크
-      var schoolType = rowData["학교 유형"] || rowData["학교유형"] || rowData["유형"] || "일반고";
-      var link = rowData["교과 편성표(링크)"] || rowData["링크"] || "링크입력예정";
-      
-      var schoolCode = rowData["학교 코드(고유값)"] || rowData["학교코드(고유값)"] || "";
-      if (!schoolCode && name) {
-        var prefix = name.substring(0, 4);
-        schoolCode = year + prefix;
-      }
-
-      var lastCol = Math.max(7, sheet.getLastColumn());
-      var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-      var newRow = [];
-      
-      // 구글 시트 헤더명이 존재하는 경우 해당 열에 맞게 매핑
-      if (headers.length >= 7 && headers[0] !== "") {
-        for (var i = 0; i < headers.length; i++) {
-          var h = String(headers[i]).trim();
-          if (h === "입력 시간" || h === "입력시간" || h === "입력일시") newRow.push(timestamp);
-          else if (h === "학교 코드(고유값)" || h === "학교코드(고유값)" || h === "학교코드") newRow.push(schoolCode);
-          else if (h === "학년도" || h === "연도") newRow.push(year);
-          else if (h === "학교명") newRow.push(name);
-          else if (h === "학생 수" || h === "학생수" || h === "전교 학생수" || h === "전교학생수") newRow.push(students);
-          else if (h === "학교 유형" || h === "학교유형" || h === "유형") newRow.push(schoolType);
-          else if (h === "교과 편성표(링크)" || h === "링크") newRow.push(link);
-          else newRow.push(rowData[h] || "");
-        }
-      } else {
-        // 기본 7개 컬럼 순서 고정 저장
-        newRow = [timestamp, schoolCode, year, name, students, schoolType, link];
-      }
-      
-      sheet.appendRow(newRow);
-      response.success = true;
-      response.message = "'" + name + "' 학교 기본 정보가 성공적으로 등록되었습니다.";
-      response.data = newRow;
-      
-    // -----------------------------------------------------------------------
-    // B. 수시 합격 데이터 등록 ('sushi')
-    // -----------------------------------------------------------------------
-    } else if (table === "sushi") {
+    // B. 수시 합격 데이터 저장 ('sushi')
+    if (table === "sushi") {
       var sheet = getSheetByName(ss, ["수시합격_입력", "수시합격", "수시"]);
       if (!sheet) throw new Error("'수시합격_입력' 시트를 찾을 수 없습니다.");
       
@@ -134,11 +96,9 @@ function doPost(e) {
       ]);
       
       response.success = true;
-      response.message = "수시 합격 데이터(입력일시: " + timestamp + ")가 성공적으로 등록되었습니다.";
+      response.message = "수시 합격 데이터가 성공적으로 등록되었습니다.";
       
-    // -----------------------------------------------------------------------
-    // C. 특별 프로그램 데이터 등록 ('programs')
-    // -----------------------------------------------------------------------
+    // C. 특별 프로그램 데이터 저장 ('programs')
     } else if (table === "programs") {
       var sheet = getSheetByName(ss, ["특별프로그램_입력", "특별프로그램", "프로그램"]);
       if (!sheet) throw new Error("'특별프로그램_입력' 시트를 찾을 수 없습니다.");
@@ -157,7 +117,7 @@ function doPost(e) {
       ]);
       
       response.success = true;
-      response.message = "특별 프로그램 데이터(입력일시: " + timestamp + ")가 성공적으로 등록되었습니다.";
+      response.message = "특별 프로그램 데이터가 성공적으로 등록되었습니다.";
     }
     
   } catch (err) {
@@ -169,7 +129,88 @@ function doPost(e) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-// 헬퍼 3: 시트 데이터를 JSON 객체 배열로 변환하는 함수
+/**
+ * 3. '학교_기본정보' 전용 저장 함수 (google.script.run 및 doPost 호환)
+ * A열: 입력시간 (타임스탬프)
+ * B열: 학교코드 (자동 생성/매핑)
+ * C열: 학생수
+ * D열: 학교유형
+ * E열: 교과편성표 드라이브 링크
+ */
+function saveSchoolBasicInfo(data) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = getSheetByName(ss, ["학교_기본정보", "학교_기본 정보", "학교기본정보", "학교"]);
+    if (!sheet) {
+      throw new Error("'학교_기본정보' 시트를 찾을 수 없습니다.");
+    }
+    
+    // A열: 타임스탬프 (YYYY-MM-DD HH:mm:ss)
+    var timestamp = data["입력 시간"] || data["입력시간"] || data["입력일시"] || Utilities.formatDate(new Date(), "Asia/Seoul", "yyyy-MM-dd HH:mm:ss");
+    
+    // 학교명 및 학년도 기반 학교 코드 자동 생성
+    var name = data["학교명"] || "";
+    var rawYear = data["학년도"] || data["연도"] || "2026";
+    var yearNum = String(rawYear).replace(/[^0-9]/g, "");
+    var prefix = name.length >= 4 ? name.substring(0, 4) : name;
+    
+    // B열: 학교 코드
+    var schoolCode = data["학교 코드"] || data["학교코드"] || data["학교 코드(고유값)"] || data["학교코드(고유값)"] || (yearNum + prefix);
+    
+    // C열: 학생 수
+    var students = data["학생 수"] || data["학생수"] || data["전교 학생수"] || data["전교학생수"] || data["studentCount"] || "";
+    
+    // D열: 학교 유형
+    var schoolType = data["학교 유형"] || data["학교유형"] || data["유형"] || "일반고";
+    
+    // E열: 교과 편성표 드라이브 링크
+    var link = data["교과 편성표"] || data["교과편성표"] || data["교과 편성표(링크)"] || data["드라이브링크"] || data["링크"] || "";
+
+    var lastCol = sheet.getLastColumn();
+    var newRow = [];
+
+    // 시트에 1행 헤더가 명시되어 있을 경우 헤더 위치에 정확히 대응
+    if (lastCol >= 5) {
+      var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+      var hasMatchedHeaders = false;
+      
+      for (var i = 0; i < headers.length; i++) {
+        var h = String(headers[i]).trim();
+        if (h.indexOf("입력") !== -1 || h.indexOf("시간") !== -1) { newRow.push(timestamp); hasMatchedHeaders = true; }
+        else if (h.indexOf("코드") !== -1) { newRow.push(schoolCode); hasMatchedHeaders = true; }
+        else if (h.indexOf("학생") !== -1) { newRow.push(students); hasMatchedHeaders = true; }
+        else if (h.indexOf("유형") !== -1) { newRow.push(schoolType); hasMatchedHeaders = true; }
+        else if (h.indexOf("편성") !== -1 || h.indexOf("링크") !== -1 || h.indexOf("드라이브") !== -1) { newRow.push(link); hasMatchedHeaders = true; }
+        else if (h.indexOf("학년") !== -1 || h.indexOf("연도") !== -1) { newRow.push(yearNum); }
+        else if (h.indexOf("학교명") !== -1) { newRow.push(name); }
+        else { newRow.push(data[h] || ""); }
+      }
+
+      if (!hasMatchedHeaders) {
+        // 헤더 매핑 미일치 시 A~E열 표준 순서 기록
+        newRow = [timestamp, schoolCode, students, schoolType, link];
+      }
+    } else {
+      // 기본 A~E열 5개 컬럼 순서 고정 저장 (A:입력시간, B:학교코드, C:학생수, D:학교유형, E:드라이브링크)
+      newRow = [timestamp, schoolCode, students, schoolType, link];
+    }
+    
+    sheet.appendRow(newRow);
+
+    return {
+      success: true,
+      message: "'" + name + "' 학교 기본 정보가 성공적으로 구글 시트(A~E열)에 저장되었습니다.",
+      data: newRow
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err.toString()
+    };
+  }
+}
+
+// 헬퍼 1: 시트 데이터를 JSON 객체 배열로 반환
 function getSheetDataAsObjects(sheet) {
   var lastRow = sheet.getLastRow();
   var lastCol = sheet.getLastColumn();
@@ -193,7 +234,7 @@ function getSheetDataAsObjects(sheet) {
   return result;
 }
 
-// 헬퍼 4: 여러 예비 이름 중 일치하는 시트를 찾아주는 함수
+// 헬퍼 2: 여러 후보 이름 중 실제로 존재하는 시트 반환
 function getSheetByName(ss, nameCandidates) {
   for (var i = 0; i < nameCandidates.length; i++) {
     var sheet = ss.getSheetByName(nameCandidates[i]);
