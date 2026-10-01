@@ -30,7 +30,7 @@
         <h2 class="text-xl sm:text-2xl font-extrabold tracking-tight text-[#1D1D1F]">인근 고등학교 수시 합격 DB</h2>
         <p class="text-xs text-[#86868B] font-medium leading-relaxed">
           선생님을 위한 맞춤형 입시 상담 데이터베이스<br>
-          <span class="text-[11px] text-slate-400">성명과 사번(또는 오늘 날짜 YYYYMMDD)으로 로그인해 주세요.</span>
+          <span class="text-[11px] text-slate-400">성명, 휴대폰 뒷자리 4개, 사번(또는 오늘 날짜 YYYYMMDD)으로 로그인해 주세요.</span>
         </p>
       </div>
 
@@ -44,18 +44,18 @@
           </label>
           <div class="relative">
             <i data-lucide="user" class="w-4 h-4 text-[#86868B] absolute left-4 top-1/2 -translate-y-1/2"></i>
-            <input type="text" id="login-name" required placeholder="예: 라종윤, 조재덕" class="w-full bg-[#F5F5F7] border-0 rounded-2xl pl-11 pr-4 min-h-[48px] text-xs font-semibold text-[#1D1D1F] placeholder:text-[#86868B] focus:bg-white focus:ring-2 focus:ring-[#007AFF] transition-all">
+            <input type="text" id="login-name" required placeholder="예: 분당러셀" class="w-full bg-[#F5F5F7] border-0 rounded-2xl pl-11 pr-4 min-h-[48px] text-xs font-semibold text-[#1D1D1F] placeholder:text-[#86868B] focus:bg-white focus:ring-2 focus:ring-[#007AFF] transition-all">
           </div>
         </div>
 
-        <!-- 2) 휴대폰 번호 입력 (선택) -->
+        <!-- 2) 휴대폰 뒷자리 4개 입력 (필수) -->
         <div class="space-y-1.5">
           <label for="login-phone" class="block text-xs font-bold text-[#1D1D1F] px-1">
-            휴대폰 번호 <span class="text-[#86868B] font-normal">(선택)</span>
+            휴대폰 뒷자리 4개 입력 <span class="text-rose-500">*</span>
           </label>
           <div class="relative">
             <i data-lucide="smartphone" class="w-4 h-4 text-[#86868B] absolute left-4 top-1/2 -translate-y-1/2"></i>
-            <input type="text" id="login-phone" placeholder="숫자만 입력 (예: 01053042245)" class="w-full bg-[#F5F5F7] border-0 rounded-2xl pl-11 pr-4 min-h-[48px] text-xs font-semibold text-[#1D1D1F] placeholder:text-[#86868B] focus:bg-white focus:ring-2 focus:ring-[#007AFF] transition-all">
+            <input type="text" id="login-phone" required maxlength="4" pattern="\d{4}" placeholder="1234" class="w-full bg-[#F5F5F7] border-0 rounded-2xl pl-11 pr-4 min-h-[48px] text-xs font-semibold text-[#1D1D1F] placeholder:text-[#86868B] focus:bg-white focus:ring-2 focus:ring-[#007AFF] transition-all">
           </div>
         </div>
 
@@ -222,13 +222,10 @@
           <div class="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
             <label class="text-xs font-bold text-[#1D1D1F] flex items-center gap-1.5 flex-shrink-0">
               <i data-lucide="calendar" class="w-4 h-4 text-[#007AFF]"></i>
-              <span>연도 선택:</span>
+              <span>학년도 선택:</span>
             </label>
             <select id="filter-year" onchange="renderSchoolList()" class="bg-[#F5F5F7] border-0 rounded-2xl px-4 py-2 text-xs font-bold text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]">
-              <option value="ALL">전체 연도</option>
-              <option value="2026" selected>2026년</option>
-              <option value="2025">2025년</option>
-              <option value="2024">2024년</option>
+              <option value="ALL">전체</option>
             </select>
           </div>
 
@@ -272,7 +269,7 @@
           </button>
           <button id="subtab-btn-school" onclick="switchSubTab('school')" class="sub-tab px-4 py-2.5 rounded-2xl text-xs font-medium text-[#86868B] bg-white hover:bg-slate-50 transition-all flex items-center gap-1.5">
             <i data-lucide="school" class="w-4 h-4"></i>
-            <span>3. 학교 기본 정보 (학생수/편성표)</span>
+            <span>3. 학교 기본 정보 (학생수/유형/편성표)</span>
           </button>
         </div>
 
@@ -295,9 +292,16 @@
               <div class="space-y-1.5">
                 <label class="block text-xs font-bold text-[#1D1D1F]">연도 <span class="text-rose-500">*</span></label>
                 <select id="sushi-year" required class="w-full bg-white border-0 rounded-2xl px-4 py-3 min-h-[48px] text-xs font-bold text-[#1D1D1F] focus:ring-2 focus:ring-[#007AFF]">
-                  <option value="2026" selected>2026년</option>
-                  <option value="2025">2025년</option>
-                  <option value="2024">2024년</option>
+                  <option value="2030">2030</option>
+                  <option value="2029">2029</option>
+                  <option value="2028">2028</option>
+                  <option value="2027">2027</option>
+                  <option value="2026" selected>2026</option>
+                  <option value="2025">2025</option>
+                  <option value="2024">2024</option>
+                  <option value="2023">2023</option>
+                  <option value="2022">2022</option>
+                  <option value="2021">2021</option>
                 </select>
               </div>
 
@@ -376,9 +380,16 @@
               <div class="space-y-1.5">
                 <label class="block text-xs font-bold text-[#1D1D1F]">연도 <span class="text-rose-500">*</span></label>
                 <select id="prog-year" required class="w-full bg-[#F5F5F7] border-0 rounded-2xl px-4 py-3 min-h-[48px] text-xs font-semibold text-[#1D1D1F] focus:ring-2 focus:ring-[#5856D6]">
-                  <option value="2026" selected>2026년</option>
-                  <option value="2025">2025년</option>
-                  <option value="2024">2024년</option>
+                  <option value="2030">2030</option>
+                  <option value="2029">2029</option>
+                  <option value="2028">2028</option>
+                  <option value="2027">2027</option>
+                  <option value="2026" selected>2026</option>
+                  <option value="2025">2025</option>
+                  <option value="2024">2024</option>
+                  <option value="2023">2023</option>
+                  <option value="2022">2022</option>
+                  <option value="2021">2021</option>
                 </select>
               </div>
 
@@ -419,33 +430,52 @@
           <div class="border-b border-black/5 pb-4">
             <h3 class="text-base sm:text-lg font-extrabold text-[#1D1D1F] flex items-center gap-2">
               <span class="w-7 h-7 rounded-xl bg-blue-100 text-[#007AFF] flex items-center justify-center text-xs font-black">3</span>
-              <span>학교 기본 정보 (전체 학생 수 및 교과 편성표 링크)</span>
+              <span>3. 학교 기본 정보 (학생수/유형/편성표)</span>
             </h3>
-            <p class="text-xs text-[#86868B] mt-1 leading-relaxed">구글 시트 '학교_기본정보'의 B열(연도), C열(학교명), D열(전교 학생수), E열(링크)에 저장됩니다.</p>
+            <p class="text-xs text-[#86868B] mt-1 leading-relaxed">구글 시트 '학교_기본정보'의 입력 시간(A열), 학교 코드(B열), 학생 수(C열), 학교 유형(D열), 교과 편성표(E열)에 저장됩니다.</p>
           </div>
 
           <form id="school-form" onsubmit="handleSchoolSubmit(event)" class="space-y-4">
             
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div class="space-y-1.5">
-                <label class="block text-xs font-bold text-[#1D1D1F]">연도 <span class="text-rose-500">*</span></label>
+                <label class="block text-xs font-bold text-[#1D1D1F]">학년도 <span class="text-rose-500">*</span></label>
                 <select id="school-year" required class="w-full bg-[#F5F5F7] border-0 rounded-2xl px-4 py-3 min-h-[48px] text-xs font-semibold text-[#1D1D1F] focus:ring-2 focus:ring-[#007AFF]">
-                  <option value="2026" selected>2026년</option>
-                  <option value="2025">2025년</option>
-                  <option value="2024">2024년</option>
+                  <option value="2030">2030</option>
+                  <option value="2029">2029</option>
+                  <option value="2028">2028</option>
+                  <option value="2027">2027</option>
+                  <option value="2026" selected>2026</option>
+                  <option value="2025">2025</option>
+                  <option value="2024">2024</option>
+                  <option value="2023">2023</option>
+                  <option value="2022">2022</option>
+                  <option value="2021">2021</option>
                 </select>
               </div>
 
               <div class="space-y-1.5 sm:col-span-2">
                 <label class="block text-xs font-bold text-[#1D1D1F]">학교명 <span class="text-rose-500">*</span></label>
-                <input type="text" id="school-name" required list="school-datalist" placeholder="학교명 선택 또는 직접 입력 (예: 낙생고)" class="w-full bg-[#F5F5F7] border-0 rounded-2xl px-4 py-3 min-h-[48px] text-xs font-semibold text-[#1D1D1F] focus:ring-2 focus:ring-[#007AFF]">
+                <input type="text" id="school-name" required list="school-datalist" placeholder="학교명 선택 또는 직접 입력 (예: 야탑고)" class="w-full bg-[#F5F5F7] border-0 rounded-2xl px-4 py-3 min-h-[48px] text-xs font-semibold text-[#1D1D1F] focus:ring-2 focus:ring-[#007AFF]">
               </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div class="space-y-1.5">
-                <label class="block text-xs font-bold text-[#1D1D1F]">전교 학생수</label>
+                <label class="block text-xs font-bold text-[#1D1D1F]">학생 수</label>
                 <input type="text" id="school-students" placeholder="예: 350" class="w-full bg-[#F5F5F7] border-0 rounded-2xl px-4 py-3 min-h-[48px] text-xs font-semibold text-[#1D1D1F] focus:ring-2 focus:ring-[#007AFF]">
+              </div>
+
+              <div class="space-y-1.5">
+                <label class="block text-xs font-bold text-[#1D1D1F]">학교 유형 <span class="text-rose-500">*</span></label>
+                <select id="school-type" required class="w-full bg-[#F5F5F7] border-0 rounded-2xl px-4 py-3 min-h-[48px] text-xs font-semibold text-[#1D1D1F] focus:ring-2 focus:ring-[#007AFF]">
+                  <option value="일반고" selected>일반고</option>
+                  <option value="자율형공립고">자율형공립고 (자공고)</option>
+                  <option value="특목고">특수목적고 (특목고)</option>
+                  <option value="자율형사립고">자율형사립고 (자사고)</option>
+                  <option value="특성화고">특성화고</option>
+                  <option value="기타">기타</option>
+                </select>
               </div>
 
               <div class="space-y-1.5">
@@ -457,7 +487,7 @@
             <div class="pt-4 border-t border-black/5 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div class="text-xs text-[#86868B] flex items-center gap-2">
                 <i data-lucide="info" class="w-4 h-4 text-[#007AFF]"></i>
-                <span>전교 학생수 및 편성표는 상담 시 기초 자료로 사용됩니다.</span>
+                <span>입력 시간과 학교 코드는 제출 시 시스템에서 자동 생성됩니다.</span>
               </div>
               <button type="submit" id="school-submit-btn" class="w-full sm:w-auto px-8 py-3.5 min-h-[50px] bg-[#007AFF] hover:bg-[#0062CC] text-white text-xs sm:text-sm font-extrabold rounded-2xl shadow-lg shadow-blue-500/20 apple-button-touch flex items-center justify-center gap-2">
                 <i data-lucide="check" class="w-4 h-4"></i>
@@ -507,19 +537,33 @@
       <!-- 모달 스크롤 본문 -->
       <div class="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1 bg-[#F5F5F7]">
         
-        <!-- 1) 학교 기본 정보 & 교과 편성표 링크 -->
-        <div class="bg-white p-5 rounded-3xl border border-black/5 apple-card-shadow flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div class="flex items-center gap-4 w-full sm:w-auto">
-            <div class="p-3 bg-blue-50 text-[#007AFF] rounded-2xl">
-              <i data-lucide="users" class="w-6 h-6"></i>
+        <!-- 1) 학교 기본 정보 (전체 학생 수 & 고교 유형 나란히 바인딩 & 교과 편성표 링크) -->
+        <div class="bg-white p-5 sm:p-6 rounded-3xl border border-black/5 apple-card-shadow flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div class="flex items-center gap-3 sm:gap-4 w-full sm:w-auto flex-wrap sm:flex-nowrap">
+            <!-- 전체 학생 수 영역 -->
+            <div class="flex items-center gap-3 p-3.5 rounded-2xl bg-[#F5F5F7] border border-black/5 flex-1 sm:flex-initial">
+              <div class="p-2.5 bg-blue-50 text-[#007AFF] rounded-xl flex-shrink-0">
+                <i data-lucide="users" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <p class="text-[11px] text-[#86868B] font-medium">전체 학생 수</p>
+                <h4 id="modal-school-students" class="text-base font-extrabold text-[#1D1D1F]">- 명</h4>
+              </div>
             </div>
-            <div>
-              <p class="text-xs text-[#86868B] font-medium">전체 학생 수</p>
-              <h4 id="modal-school-students" class="text-lg font-extrabold text-[#1D1D1F]">- 명</h4>
+
+            <!-- 고교 유형 영역 -->
+            <div class="flex items-center gap-3 p-3.5 rounded-2xl bg-blue-50/80 border border-blue-100 flex-1 sm:flex-initial">
+              <div class="p-2.5 bg-white text-[#007AFF] rounded-xl shadow-xs flex-shrink-0">
+                <i data-lucide="building-2" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <p class="text-[11px] text-[#007AFF] font-bold">고교 유형</p>
+                <h4 id="modal-school-type" class="text-base font-extrabold text-[#007AFF]">일반고</h4>
+              </div>
             </div>
           </div>
 
-          <div id="modal-curriculum-container" class="w-full sm:w-auto text-right">
+          <div id="modal-curriculum-container" class="w-full sm:w-auto text-right flex-shrink-0">
             <!-- 교과 편성표 링크 버튼 동적 삽입 -->
           </div>
         </div>

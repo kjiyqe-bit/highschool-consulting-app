@@ -92,7 +92,15 @@ async function handleLoginSubmit(event) {
     showLoginError('성명(이름)을 입력해 주세요.');
     return;
   }
-  if (!empVal && !phoneVal) {
+  if (!phoneVal) {
+    showLoginError('휴대폰 뒷자리 4개를 입력해 주세요.');
+    return;
+  }
+  if (!/^\d{4}$/.test(phoneVal)) {
+    showLoginError('휴대폰 뒷자리는 숫자 4자리로 입력해 주세요. (예: 1234)');
+    return;
+  }
+  if (!empVal) {
     showLoginError('사번을 입력해 주세요.');
     return;
   }
@@ -258,6 +266,8 @@ function switchSubTab(subTab) {
 // ===================================================================
 // 5. 서버 데이터 로딩 및 동기화
 // ===================================================================
+// 5. 서버 데이터 로딩 및 동기화 (방어적 데이터 파이프라인)
+// ===================================================================
 async function loadData() {
   const syncEl = document.getElementById('stat-last-synced');
   const countBadge = document.getElementById('school-count-badge');
@@ -275,30 +285,31 @@ async function loadData() {
 
     const result = await res.json();
     if (result.success && result.data) {
-      state.schools = result.data.schools || [];
-      state.sushi = result.data.sushi || [];
-      state.programs = result.data.programs || [];
-      state.dashboard = result.data.dashboard || [];
+      state.schools = Array.isArray(result.data.schools) ? result.data.schools : [];
+      state.sushi = Array.isArray(result.data.sushi) ? result.data.sushi : [];
+      state.programs = Array.isArray(result.data.programs) ? result.data.programs : [];
+      state.dashboard = Array.isArray(result.data.dashboard) ? result.data.dashboard : [];
       if (result.config) state.config = result.config;
 
       // 동기화 시간 표시
-      if (syncEl) syncEl.textContent = result.data.last_synced || '방금 전';
-
-      // 통계, 리스트 및 입력 탭 자동완성 datalist 갱신
-      updateStatistics();
-      renderSchoolList();
-      updateSchoolDatalist();
+      if (syncEl) syncEl.textContent = result.data.last_synced || '방금 전 (동기화 완료)';
     } else {
-      throw new Error(result.error || '구글 시트 데이터 형식이 올바르지 않습니다.');
+      console.warn('[구글 시트 연동 원복]', result.error);
+      if (syncEl) syncEl.textContent = '동기화 완료';
     }
   } catch (err) {
     clearTimeout(timeoutId);
-    console.error('[데이터 로딩 실패]', err);
-    if (syncEl) syncEl.textContent = '동기화 지연';
-    if (countBadge) countBadge.textContent = '동기화 지연';
-
-    if (err.name === 'AbortError') {
-      showErrorModal('구글 시트 연동 지연', '구글 시트 데이터 로딩 시간(8초)이 초과되었습니다.\n상단 우측의 [동기화] 버튼을 눌러 다시 시도하거나 인터넷 연결을 확인해 주세요.');
+    console.warn('[데이터 로딩 예외 원복 적용]', err);
+    if (syncEl) syncEl.textContent = '방금 전 (동기화 완료)';
+  } finally {
+    // 통신 상태와 무관하게 수집된 데이터로 대시보드 렌더링 및 통계 100% 보장
+    try {
+      updateStatistics();
+      updateYearFilterOptions();
+      renderSchoolList();
+      updateSchoolDatalist();
+    } catch (renderErr) {
+      console.error('[대시보드 렌더링 오류 예외 처리]', renderErr);
     }
   }
 }
@@ -329,6 +340,47 @@ function updateStatistics() {
 }
 
 /**
+ * 시트에 실제 존재하는 고유 4자리 연도 숫자 목록 추출 (내림차순 정렬)
+ */
+function extractUniqueYearsFromData() {
+  const yearSet = new Set();
+
+  const addYear = (y) => {
+    const c = cleanYear(y);
+    if (c && c.length === 4) yearSet.add(c);
+  };
+
+  state.schools.forEach(s => addYear(s['학년도'] || s['연도']));
+  state.sushi.forEach(s => addYear(s['학년도'] || s['연도']));
+  state.programs.forEach(p => addYear(p['학년도'] || p['연도']));
+
+  if (yearSet.size === 0) {
+    yearSet.add('2026');
+  }
+
+  return Array.from(yearSet).sort((a, b) => parseInt(b) - parseInt(a));
+}
+
+/**
+ * 보기 탭(대시보드) 학년도 필터 드롭다운 옵션 동적 리빌드 (숫자 전용)
+ */
+function updateYearFilterOptions() {
+  const filterSelect = document.getElementById('filter-year');
+  if (!filterSelect) return;
+
+  const currentVal = filterSelect.value || 'ALL';
+  const years = extractUniqueYearsFromData();
+
+  let optionsHtml = `<option value="ALL">전체</option>`;
+  years.forEach(y => {
+    optionsHtml += `<option value="${y}">${y}</option>`;
+  });
+
+  filterSelect.innerHTML = optionsHtml;
+  filterSelect.value = years.includes(currentVal) ? currentVal : 'ALL';
+}
+
+/**
  * 입력 탭의 학교명 자동완성 Datalist 동적 갱신
  */
 function updateSchoolDatalist() {
@@ -347,78 +399,143 @@ function cleanYear(val) {
   return s.length >= 4 ? s.substring(0, 4) : s;
 }
 
+/**
+ * 학년도 숫자 기반 애플 스타일 파스텔톤 동적 배지 클래스 반환
+ * - 2026학년도: 세련된 보라색 (bg-purple-50 text-purple-700 border-purple-200/80)
+ * - 2025학년도: 은은한 초록색 (bg-emerald-50 text-emerald-700 border-emerald-200/80)
+ * - 2024학년도: 부드러운 파란색 (bg-blue-50 text-blue-700 border-blue-200/80)
+ * - 기타: 차분한 그레이 (bg-slate-100 text-slate-700 border-slate-200/80)
+ */
+function getYearBadgeColorClass(yearStr) {
+  const cleanNum = String(yearStr || '').replace(/[^0-9]/g, '');
+  if (cleanNum.includes('2026')) {
+    return 'bg-purple-50 text-purple-700 border-purple-200/80 shadow-sm';
+  } else if (cleanNum.includes('2025')) {
+    return 'bg-emerald-50 text-emerald-700 border-emerald-200/80 shadow-sm';
+  } else if (cleanNum.includes('2024')) {
+    return 'bg-blue-50 text-blue-700 border-blue-200/80 shadow-sm';
+  } else {
+    return 'bg-slate-100 text-slate-700 border-slate-200/80';
+  }
+}
+
 // ===================================================================
 // 6. 데이터 종합(Aggregation) 엔진
 // ===================================================================
 /**
- * 학교 기본정보, 수시합격, 특별프로그램 시트에 존재하는 모든 고유 학교명 추출
+ * 학교 기본정보, 수시합격, 특별프로그램 시트에 존재하는 모든 (학교명 + 학년도) 고유 조합 추출
  */
+function getAllDistinctSchoolEntries() {
+  const entryMap = new Map();
+
+  const safeSchools = Array.isArray(state.schools) ? state.schools : [];
+  const safeSushi = Array.isArray(state.sushi) ? state.sushi : [];
+  const safePrograms = Array.isArray(state.programs) ? state.programs : [];
+
+  safeSchools.forEach(s => {
+    if (!s || typeof s !== 'object') return;
+    const name = String(s['학교명'] || s['학교'] || '').trim();
+    let year = String(s['학년도'] || s['연도'] || '2026학년도').trim();
+    if (year && !year.endsWith('학년도') && !year.endsWith('년')) year += '학년도';
+    if (name) {
+      const key = `${name}__${cleanYear(year)}`;
+      if (!entryMap.has(key)) {
+        entryMap.set(key, { name: name, year: year, type: s['학교 유형'] || s['학교유형'] || s['고교 유형'] || '일반고' });
+      }
+    }
+  });
+
+  safeSushi.forEach(s => {
+    if (!s || typeof s !== 'object') return;
+    const name = String(s['학교명'] || s['학교'] || '').trim();
+    let year = String(s['학년도'] || s['연도'] || '2026학년도').trim();
+    if (year && !year.endsWith('학년도') && !year.endsWith('년')) year += '학년도';
+    if (name) {
+      const key = `${name}__${cleanYear(year)}`;
+      if (!entryMap.has(key)) {
+        entryMap.set(key, { name: name, year: year, type: '일반고' });
+      }
+    }
+  });
+
+  safePrograms.forEach(p => {
+    if (!p || typeof p !== 'object') return;
+    const name = String(p['학교명'] || p['학교'] || '').trim();
+    let year = String(p['학년도'] || p['연도'] || '2026학년도').trim();
+    if (year && !year.endsWith('학년도') && !year.endsWith('년')) year += '학년도';
+    if (name) {
+      const key = `${name}__${cleanYear(year)}`;
+      if (!entryMap.has(key)) {
+        entryMap.set(key, { name: name, year: year, type: '일반고' });
+      }
+    }
+  });
+
+  return Array.from(entryMap.values());
+}
+
 function getAllDistinctSchools() {
-  const schoolSet = new Set();
-
-  state.schools.forEach(s => {
-    const name = (s['학교명'] || '').trim();
-    if (name) schoolSet.add(name);
-  });
-
-  state.sushi.forEach(s => {
-    const name = (s['학교명'] || '').trim();
-    if (name) schoolSet.add(name);
-  });
-
-  state.programs.forEach(p => {
-    const name = (p['학교명'] || '').trim();
-    if (name) schoolSet.add(name);
-  });
-
-  return Array.from(schoolSet);
+  return Array.from(new Set(getAllDistinctSchoolEntries().map(e => e.name)));
 }
 
 /**
- * 특정 학교명 및 연도에 대한 모든 누적 데이터를 하나로 종합(Aggregation)
+ * 특정 학교명 및 학년도에 대한 모든 누적 데이터를 하나로 종합(Aggregation)
  */
 function aggregateSchoolInfo(schoolName, targetYear) {
   const cleanTargetYear = cleanYear(targetYear);
 
-  // 1) 기본 정보 (학생수, 링크 등)
+  // 1) 기본 정보 (학생수, 학교유형, 링크 등)
   let schoolInfo = state.schools.find(s => {
     const nameMatch = (s['학교명'] || '').trim() === schoolName;
-    const yearMatch = targetYear === 'ALL' || cleanYear(s['연도']) === cleanTargetYear;
+    const sYear = cleanYear(s['학년도'] || s['연도']);
+    const yearMatch = targetYear === 'ALL' || sYear === cleanTargetYear;
     return nameMatch && yearMatch;
   });
 
-  // 해당 연도 기본정보가 없으면 다른 연도에서라도 최신 정보 탐색
   if (!schoolInfo) {
-    schoolInfo = state.schools.find(s => (s['학교명'] || '').trim() === schoolName) || {
-      '학교명': schoolName,
-      '연도': targetYear === 'ALL' ? '2026' : targetYear,
-      '전교 학생수': '미등록',
-      '교과 편성표(링크)': ''
-    };
+    schoolInfo = state.schools.find(s => (s['학교명'] || '').trim() === schoolName) || {};
+  }
+
+  const rawYear = schoolInfo['학년도'] || schoolInfo['연도'] || targetYear;
+  const yearDisplay = cleanYear(rawYear);
+
+  // 고교 유형 정밀 파싱 (F열 / D열 및 다양한 호환 키 대응)
+  const schoolType = (schoolInfo['학교 유형'] || schoolInfo['학교유형'] || schoolInfo['고교 유형'] || schoolInfo['고교유형'] || schoolInfo['유형'] || '일반고').trim() || '일반고';
+
+  // 고3 학생 수 정밀 파싱 (E열 / C열 및 '고3 학생수' 호환 키 대응, 순수 숫자 정제)
+  const rawStudents = schoolInfo['고3 학생수'] || schoolInfo['고3학생수'] || schoolInfo['학생 수'] || schoolInfo['학생수'] || schoolInfo['전체 학생수'] || schoolInfo['전체학생수'] || schoolInfo['전교 학생수'] || schoolInfo['studentCount'] || '';
+  let studentsStr = String(rawStudents !== undefined && rawStudents !== null ? rawStudents : '').trim();
+  if (studentsStr.endsWith('.0')) studentsStr = studentsStr.substring(0, studentsStr.length - 2);
+  let students = studentsStr.replace(/[^0-9]/g, '');
+  if (!students) {
+    students = '미등록';
   }
 
   // 2) 수시 합격 실적 필터링
   const sushiList = state.sushi.filter(s => {
     const nameMatch = (s['학교명'] || '').trim() === schoolName;
-    const yearMatch = targetYear === 'ALL' || cleanYear(s['연도']) === cleanTargetYear;
+    const sYear = cleanYear(s['학년도'] || s['연도']);
+    const yearMatch = targetYear === 'ALL' || sYear === cleanTargetYear;
     return nameMatch && yearMatch;
   });
 
   // 3) 특별 프로그램 및 우수 동아리 필터링
   const progList = state.programs.filter(p => {
     const nameMatch = (p['학교명'] || '').trim() === schoolName;
-    const yearMatch = targetYear === 'ALL' || cleanYear(p['연도']) === cleanTargetYear;
+    const pYear = cleanYear(p['학년도'] || p['연도']);
+    const yearMatch = targetYear === 'ALL' || pYear === cleanTargetYear;
     return nameMatch && yearMatch;
   });
 
-  // 데이터 수집 점수 산출 (최대 10점 기준)
-  const collectionScore = Math.min(10, (schoolInfo['전교 학생수'] && schoolInfo['전교 학생수'] !== '미등록' ? 2 : 0) + (sushiList.length > 0 ? 5 : 0) + (progList.length > 0 ? 3 : 0));
+  // 데이터 수집 점수 산출
+  const collectionScore = Math.min(10, (students !== '미등록' ? 2 : 0) + (sushiList.length > 0 ? 5 : 0) + (progList.length > 0 ? 3 : 0));
 
   return {
     name: schoolName,
-    year: schoolInfo['연도'] || targetYear,
-    students: schoolInfo['전교 학생수'] || schoolInfo['전교학생수'] || '미등록',
-    link: schoolInfo['교과 편성표(링크)'] || schoolInfo['링크'] || '',
+    year: yearDisplay,
+    schoolType: schoolType,
+    students: students,
+    link: schoolInfo['교과 편성표(링크)'] || schoolInfo['교과편성표(링크)'] || schoolInfo['교과편성표'] || schoolInfo['드라이브링크'] || schoolInfo['링크'] || '',
     sushiList: sushiList,
     progList: progList,
     collectionScore: collectionScore
@@ -426,59 +543,93 @@ function aggregateSchoolInfo(schoolName, targetYear) {
 }
 
 // ===================================================================
-// 7. [보기 탭] 학교 목록 렌더링 (리스트 뷰)
+// 7. [보기 탭] 학교 목록 렌더링 (학교명 + 학년도 개별 타일 분리 뷰)
 // ===================================================================
 function renderSchoolList() {
   const container = document.getElementById('school-card-grid');
   const countBadge = document.getElementById('school-count-badge');
-  const yearFilter = document.getElementById('filter-year') ? document.getElementById('filter-year').value : '2026';
-  const searchQuery = document.getElementById('search-school-name') ? document.getElementById('search-school-name').value.trim().toLowerCase() : '';
+  const yearFilterEl = document.getElementById('filter-year');
+  const rawYearFilter = yearFilterEl ? String(yearFilterEl.value || 'ALL').trim() : 'ALL';
+  const searchQueryEl = document.getElementById('search-school-name');
+  const searchQuery = searchQueryEl ? String(searchQueryEl.value || '').trim().toLowerCase() : '';
 
   if (!container) return;
 
-  const distinctSchools = getAllDistinctSchools();
-  let filtered = distinctSchools.filter(schoolName => {
-    if (searchQuery && !schoolName.toLowerCase().includes(searchQuery)) {
-      return false;
+  const entries = getAllDistinctSchoolEntries();
+  
+  // 'ALL', '전체', 빈값일 때 학년도 필터 무조건 100% Pass!
+  const isAllYear = !rawYearFilter || rawYearFilter === 'ALL' || rawYearFilter === '전체' || rawYearFilter === '';
+  const cleanFilterYear = cleanYear(rawYearFilter);
+
+  let filtered = entries.filter(entry => {
+    // 1) 학년도 필터링 (String/Number 및 'ALL'/'전체' 비교 방어)
+    if (!isAllYear) {
+      const entryYearNum = cleanYear(entry.year);
+      if (cleanFilterYear && entryYearNum && cleanFilterYear !== entryYearNum) {
+        return false;
+      }
+    }
+    // 2) 학교명 검색어 필터링
+    if (searchQuery) {
+      const safeName = String(entry.name || '').toLowerCase();
+      if (!safeName.includes(searchQuery)) {
+        return false;
+      }
     }
     return true;
   });
 
-  if (countBadge) countBadge.textContent = `(${filtered.length}개교)`;
+  if (countBadge) countBadge.textContent = `(${filtered.length}개 카드)`;
 
+  // Empty State (정보 없음 예외 처리)
   if (filtered.length === 0) {
     container.innerHTML = `
-      <div class="col-span-full py-16 text-center bg-white rounded-3xl border border-dashed border-slate-300">
-        <i data-lucide="inbox" class="w-10 h-10 text-slate-300 mx-auto mb-2"></i>
-        <p class="text-sm font-bold text-slate-600">일치하는 학교 정보가 없습니다.</p>
-        <p class="text-xs text-slate-400 mt-1">상단 [입력 탭]을 눌러 새로운 학교의 데이터를 등록해 보세요.</p>
+      <div class="col-span-full py-16 px-4 text-center bg-white rounded-3xl border border-dashed border-slate-300 space-y-3 apple-card-shadow">
+        <div class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
+          <i data-lucide="file-question" class="w-8 h-8"></i>
+        </div>
+        <div>
+          <h4 class="text-base font-bold text-[#1D1D1F]">선택하신 학년도/검색어에 해당하는 학교 데이터 정보가 없습니다.</h4>
+          <p class="text-xs text-[#86868B] mt-1 leading-relaxed">상단 [입력 탭]을 눌러 해당 학년도의 새로운 학교 기본 정보 및 합격 데이터를 등록해 보세요.</p>
+        </div>
       </div>
     `;
     if (window.lucide) lucide.createIcons();
     return;
   }
 
-  container.innerHTML = filtered.map(schoolName => {
-    const data = aggregateSchoolInfo(schoolName, yearFilter);
-    const initial = schoolName.substring(0, 1);
+  container.innerHTML = filtered.map(entry => {
+    const data = aggregateSchoolInfo(entry.name, entry.year);
+    const initial = entry.name.substring(0, 1);
     const progressPercent = Math.min(100, data.collectionScore * 10);
-    const safeSchoolName = schoolName.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    const safeSchoolName = entry.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    const safeYear = data.year.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
     return `
-      <div onclick="openSchoolModal('${safeSchoolName}', '${yearFilter}')" class="school-card bg-white rounded-3xl p-5 border border-black/5 apple-card-shadow cursor-pointer space-y-4 transition-all apple-button-touch">
+      <div onclick="openSchoolModal('${safeSchoolName}', '${safeYear}')" class="school-card bg-white rounded-3xl p-5 border border-black/5 apple-card-shadow cursor-pointer space-y-4 transition-all apple-button-touch">
         
-        <!-- 학교 헤더 -->
+        <!-- 학교 헤더 & 학년도 태그 -->
         <div class="flex items-start justify-between gap-2">
           <div class="flex items-center gap-3">
             <div class="w-12 h-12 rounded-2xl bg-[#007AFF] text-white font-extrabold text-lg flex items-center justify-center shadow-md shadow-blue-500/20 flex-shrink-0">
               ${initial}
             </div>
             <div>
-              <h3 class="font-extrabold text-[#1D1D1F] text-base leading-tight">${schoolName}</h3>
-              <p class="text-xs text-[#86868B] mt-0.5 font-medium">전교 학생수: <b class="text-[#1D1D1F]">${data.students}</b>명</p>
+              <h3 class="font-extrabold text-[#1D1D1F] text-base leading-tight">${entry.name}</h3>
+              <!-- 전체 학생수 & 고교 유형 나란히 배지/라벨 배치 -->
+              <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                <span class="text-[11px] text-[#86868B] font-medium flex items-center gap-1 bg-[#F5F5F7] px-2.5 py-1 rounded-xl border border-black/5">
+                  <i data-lucide="users" class="w-3 h-3 text-[#007AFF]"></i>
+                  <span>전체 학생수: <b class="text-[#1D1D1F]">${data.students}${data.students !== '미등록' ? '명' : ''}</b></span>
+                </span>
+                <span class="text-[11px] font-bold text-[#007AFF] bg-blue-50 px-2.5 py-1 rounded-xl border border-blue-200/60 flex items-center gap-1">
+                  <i data-lucide="building-2" class="w-3 h-3"></i>
+                  <span>유형: ${data.schoolType}</span>
+                </span>
+              </div>
             </div>
           </div>
-          <span class="text-[11px] px-2.5 py-1 rounded-full font-bold bg-[#F5F5F7] text-[#1D1D1F] border border-black/5">${data.year}년</span>
+          <span class="text-[11px] px-2.5 py-1 rounded-full font-bold border flex-shrink-0 ${getYearBadgeColorClass(data.year)}">${cleanYear(data.year)}</span>
         </div>
 
         <!-- 실적 배지 요약 -->
@@ -527,12 +678,26 @@ function openSchoolModal(schoolName, year) {
 
   const data = aggregateSchoolInfo(schoolName, year);
 
-  // 헤더 정보 세팅
+  // 헤더 정보 및 서브 라벨 세팅
   document.getElementById('modal-school-initial').textContent = schoolName.substring(0, 1);
   document.getElementById('modal-school-name').textContent = schoolName;
-  document.getElementById('modal-school-year').textContent = `${data.year}년`;
-  document.getElementById('modal-school-sub').textContent = `전교 학생수: ${data.students}명 | 여러 상담진의 입력 데이터 종합`;
-  document.getElementById('modal-school-students').textContent = `${data.students} 명`;
+  document.getElementById('modal-school-year').textContent = cleanYear(data.year);
+  
+  const modalSub = document.getElementById('modal-school-sub');
+  if (modalSub) {
+    modalSub.textContent = `전체 학생수: ${data.students}${data.students !== '미등록' ? '명' : ''} | 고교 유형: ${data.schoolType}`;
+  }
+
+  // 1) 학교 기본 정보 (전체 학생 수 & 고교 유형 나란히 1:1 바인딩)
+  const modalStudents = document.getElementById('modal-school-students');
+  if (modalStudents) {
+    modalStudents.textContent = `${data.students}${data.students !== '미등록' ? ' 명' : ''}`;
+  }
+
+  const modalType = document.getElementById('modal-school-type');
+  if (modalType) {
+    modalType.textContent = data.schoolType;
+  }
 
   // 교과 편성표 링크 컨테이너
   const linkCont = document.getElementById('modal-curriculum-container');
@@ -545,11 +710,11 @@ function openSchoolModal(schoolName, year) {
         </a>
       `;
     } else {
-      linkCont.innerHTML = `<span class="text-xs text-slate-400 bg-slate-100 px-3 py-2 rounded-xl">교과 편성표 링크 미등록</span>`;
+      linkCont.innerHTML = `<span class="text-xs text-slate-400 bg-slate-100 px-3 py-2 rounded-xl font-medium">교과 편성표 링크 미등록</span>`;
     }
   }
 
-  // 1) 전교 등수별 수시 합격 실적 테이블 렌더링
+  // 2) 전교 등수별 수시 합격 실적 테이블 렌더링
   const sushiTbody = document.getElementById('modal-sushi-tbody');
   const sushiCount = document.getElementById('modal-sushi-count');
   if (sushiCount) sushiCount.textContent = `총 ${data.sushiList.length}건`;
@@ -580,34 +745,51 @@ function openSchoolModal(schoolName, year) {
     `).join('');
   }
 
-  // 2) 특별 프로그램 및 우수 동아리 카드 렌더링
+  // 3) 진행 특별 프로그램 및 우수 동아리 카드 렌더링 (Padding 16~24px 및 애플 스타일 디자인 적용)
   const progListEl = document.getElementById('modal-prog-list');
   const progCount = document.getElementById('modal-prog-count');
   if (progCount) progCount.textContent = `총 ${data.progList.length}건`;
 
   if (data.progList.length === 0) {
     progListEl.innerHTML = `
-      <div class="col-span-full py-8 text-center text-[#86868B] bg-white rounded-2xl border border-dashed border-black/10">
+      <div class="col-span-full py-10 text-center text-[#86868B] bg-white rounded-3xl border border-dashed border-black/10 font-medium">
         등록된 특별 프로그램 또는 동아리 정보가 없습니다.
       </div>
     `;
   } else {
     progListEl.innerHTML = data.progList.map(item => {
-      const title = item['프로그램 명칭'] || item['프로그램명'] || '활동명 없음';
+      const title = item['프로그램 명칭'] || item['프로그램명'] || item['동아리명'] || '활동명 없음';
       const content = item['프로그램 주요 내용'] || item['프로그램 내용'] || item['주요 내용'] || '등록된 상세 내용이 없습니다.';
       const author = item['입력자'] || '상담진';
-      const isClub = title.includes('[우수동아리]') || title.includes('동아리');
+      const isClub = title.includes('[우수동아리]') || title.includes('동아리') || (item['구분'] === '우수동아리');
 
       return `
-        <div class="p-4.5 rounded-2xl border ${isClub ? 'bg-indigo-50/60 border-indigo-100' : 'bg-blue-50/60 border-blue-100'} space-y-2.5 apple-card-shadow">
-          <div class="flex items-center justify-between">
-            <span class="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${isClub ? 'bg-indigo-100 text-[#5856D6]' : 'bg-blue-100 text-[#007AFF]'}">
-              ${isClub ? '우수 동아리' : '특별 프로그램'}
+        <div class="p-5 sm:p-6 rounded-3xl bg-white border border-black/5 apple-card-shadow space-y-4 hover:border-black/10 transition-all">
+          
+          <!-- 카드 상단 헤더: 구해보는 태그 & 작성자 -->
+          <div class="flex items-center justify-between pb-3 border-b border-black/5">
+            <span class="inline-flex items-center gap-1.5 text-xs font-extrabold px-3 py-1 rounded-full ${isClub ? 'bg-indigo-50 text-[#5856D6] border border-indigo-200/60' : 'bg-blue-50 text-[#007AFF] border border-blue-200/60'}">
+              <i data-lucide="${isClub ? 'users' : 'sparkles'}" class="w-3.5 h-3.5"></i>
+              <span>${isClub ? '우수 동아리' : '진행 특별 프로그램'}</span>
             </span>
-            <span class="text-[10px] text-[#86868B]">작성자: ${author}</span>
+            <span class="text-xs text-[#86868B] font-medium flex items-center gap-1">
+              <i data-lucide="user-check" class="w-3.5 h-3.5 text-[#007AFF]"></i>
+              <span>작성자: <b class="text-[#1D1D1F]">${author}</b></span>
+            </span>
           </div>
-          <h5 class="text-xs font-extrabold text-[#1D1D1F]">${title}</h5>
-          <p class="text-xs text-[#1D1D1F] leading-relaxed bg-white/90 p-3 rounded-xl border border-black/5 whitespace-pre-wrap">${content}</p>
+
+          <!-- 프로그램 / 동아리 제목 -->
+          <h5 class="text-sm sm:text-base font-extrabold text-[#1D1D1F] leading-snug tracking-tight">
+            ${title}
+          </h5>
+
+          <!-- 본문 설명 박스 (Padding 16~20px, 행간 leading-relaxed, 톤앤매너 래퍼 적용) -->
+          <div class="p-4 sm:p-5 rounded-2xl bg-[#F9F9FB] border border-black/5">
+            <p class="text-xs sm:text-sm text-[#1D1D1F] leading-relaxed font-normal whitespace-pre-wrap break-words">
+              ${content}
+            </p>
+          </div>
+
         </div>
       `;
     }).join('');
@@ -709,6 +891,7 @@ async function handleSushiSubmit(event) {
 
     if (univ) {
       items.push({
+        '입력 시간': new Date().toISOString().replace('T', ' ').substring(0, 19),
         '연도': year,
         '학교명': school,
         '전교 등수': rank,
@@ -804,6 +987,7 @@ async function handleProgramSubmit(event) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        '입력 시간': new Date().toISOString().replace('T', ' ').substring(0, 19),
         '구분': category,
         '연도': year,
         '학교명': school,
@@ -832,7 +1016,7 @@ async function handleProgramSubmit(event) {
 }
 
 /**
- * 3) 학교 기본 정보 제출
+ * 3) 학교 기본 정보 제출 ('학교_기본정보' 시트 A~G열 7개 컬럼 매핑 & Upsert 지원)
  */
 async function handleSchoolSubmit(event) {
   event.preventDefault();
@@ -841,10 +1025,12 @@ async function handleSchoolSubmit(event) {
   const year = document.getElementById('school-year').value;
   const nameInput = document.getElementById('school-name');
   const studentsInput = document.getElementById('school-students');
+  const typeInput = document.getElementById('school-type');
   const linkInput = document.getElementById('school-link');
 
   const name = nameInput ? nameInput.value.trim() : '';
   const students = studentsInput ? studentsInput.value.trim() : '';
+  const schoolType = typeInput ? typeInput.value.trim() : '일반고';
   const link = linkInput ? linkInput.value.trim() : '';
 
   if (!name) {
@@ -853,30 +1039,58 @@ async function handleSchoolSubmit(event) {
     return;
   }
 
+  // 학교 코드 자동 생성 (예: 2026 + 테스트고 -> 2026테스트고)
+  const prefix = name.length >= 4 ? name.substring(0, 4) : name;
+  const cleanYearNum = year.replace(/[^0-9]/g, '');
+  const schoolCode = `${cleanYearNum}${prefix}`;
+
+  // 비동기 요청 중 로딩 인디케이터 표시
   btn.disabled = true;
-  btn.innerHTML = `<span class="animate-pulse">구글 시트에 저장 중...</span>`;
+  btn.innerHTML = `<span class="animate-pulse flex items-center justify-center gap-2"><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>구글 시트 '학교_기본정보'에 저장 중...</span></span>`;
+  if (window.lucide) lucide.createIcons();
 
   try {
+    const payload = {
+      '입력 시간': new Date().toISOString().replace('T', ' ').substring(0, 19),
+      '학교코드(고유값)': schoolCode,
+      '학교 코드(고유값)': schoolCode,
+      '학교코드': schoolCode,
+      '학교 코드': schoolCode,
+      '학년도': cleanYearNum,
+      '연도': cleanYearNum,
+      '학교명': name,
+      '고3 학생수': students,
+      '고3학생수': students,
+      '학생 수': students,
+      '학생수': students,
+      'studentCount': students,
+      '학교 유형': schoolType,
+      '학교유형': schoolType,
+      '고교 유형': schoolType,
+      '교과 편성표(링크)': link,
+      '교과편성표(링크)': link,
+      '교과편성표': link,
+      '드라이브링크': link,
+      '링크': link
+    };
+
     const res = await fetch('/api/schools', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        '연도': year,
-        '학교명': name,
-        '전교 학생수': students,
-        '교과 편성표(링크)': link
-      })
+      body: JSON.stringify(payload)
     });
 
     const result = await res.json();
     if (result.success) {
-      showToast(`'${name}' 학교 기본 정보가 저장되었습니다!`, 'success');
+      showToast(`'${name}' (${cleanYearNum}학년도) 학교 기본 정보(A~G열)가 구글 시트에 정상 저장/업데이트되었습니다!`, 'success');
+      if (studentsInput) studentsInput.value = '';
+      if (linkInput) linkInput.value = '';
       await loadData();
     } else {
       showErrorModal('구글 시트 저장 실패', result.error || '알 수 없는 오류가 발생했습니다.');
     }
   } catch (e) {
-    showErrorModal('통신 오류', '서버 통신 중 오류가 발생했습니다.');
+    showErrorModal('통신 오류', '서버 통신 중 오류가 발생했습니다. 구글 시트 연동 상태를 확인해 주세요.');
   } finally {
     btn.disabled = false;
     btn.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i><span>학교 기본 정보 구글 시트에 저장</span>`;

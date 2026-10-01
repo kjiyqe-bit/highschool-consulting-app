@@ -523,7 +523,7 @@ function aggregateSchoolInfo(schoolName, targetYear) {
   const progList = state.programs.filter(p => {
     const nameMatch = (p['학교명'] || '').trim() === schoolName;
     const pYear = cleanYear(p['학년도'] || p['연도']);
-    const yearMatch = targetYear === 'ALL' || sYear === cleanTargetYear;
+    const yearMatch = targetYear === 'ALL' || pYear === cleanTargetYear;
     return nameMatch && yearMatch;
   });
 
