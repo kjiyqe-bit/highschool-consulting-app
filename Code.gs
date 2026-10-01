@@ -1,15 +1,17 @@
 /**
  * ===========================================================================
  * 인근 고등학교 수시 합격 데이터베이스 (상담용) - Google Apps Script 백엔드 웹앱
- * 파일: Code.gs (v24 - '학교_기본정보' A~E열 컬럼 매핑 완벽 적용)
+ * 파일: Code.gs (v26 - '학교_기본정보' 7개 컬럼 A~G열 1:1 매핑 및 Upsert 지원)
  * ===========================================================================
  * [구글 시트 탭별 표준 구조 및 컬럼 배치]
- * 1. '학교_기본정보' (A~E열 5개 컬럼 표준):
- *    - A열: 입력한 시간 (타임스탬프, YYYY-MM-DD HH:mm:ss)
- *    - B열: 학교 코드 (예: 2026야탑고)
- *    - C열: 학생 수 (예: 350)
- *    - D열: 학교 유형 (선택값: 일반고, 자사고, 특목고 등)
- *    - E열: 교과 편성표 드라이브 링크 (URL 텍스트)
+ * 1. '학교_기본정보' (A~G열 7개 컬럼 명세):
+ *    - A열 (Index 0): 입력시간 (타임스탬프, YYYY-MM-DD HH:mm:ss)
+ *    - B열 (Index 1): 학교코드(고유값) (예: 2026테스트고)
+ *    - C열 (Index 2): 학년도 (예: 2026)
+ *    - D열 (Index 3): 학교명 (예: 테스트고등학교)
+ *    - E열 (Index 4): 고3 학생수 (⚠️ 문자열/텍스트 서식으로 저장)
+ *    - F열 (Index 5): 학교 유형 (예: 일반고, 자사고, 특목고 등)
+ *    - G열 (Index 6): 교과 편성표(링크) (Google Drive URL)
  *
  * 2. '수시합격_입력' (A~I열 9개 컬럼 표준):
  *    - A열: 입력 일시, B열: 학년도, C열: 학교명, D열: 전교 등수, E열: 합격 대학, F열: 합격 학과, G열: 전형명, H열: 내신 등급, I열: 입력자
@@ -19,7 +21,7 @@
  * ===========================================================================
  */
 
-// 1. HTTP GET 요청 처리 (웹앱에서 전체 시트 데이터를 조회할 때 호출)
+// 1. HTTP GET 요청 처리 (웹앱 전체 시트 데이터 조회)
 function doGet(e) {
   var response = { success: true, schools: [], sushi: [], programs: [] };
   
@@ -53,7 +55,7 @@ function doGet(e) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-// 2. HTTP POST 요청 처리 (신규 데이터 저장)
+// 2. HTTP POST 요청 처리 (신규 데이터 저장 및 Upsert 업데이트)
 function doPost(e) {
   var response = { success: false, message: "" };
   
@@ -64,7 +66,7 @@ function doPost(e) {
     var table = data.table;
     var rowData = data.data || {};
     
-    // 학교 기본 정보 저장 요청 처리 ('schools' 또는 direct 매핑)
+    // 학교 기본 정보 저장 요청 처리 ('schools' 테이블)
     if (table === "schools") {
       var result = saveSchoolBasicInfo(rowData);
       return ContentService.createTextOutput(JSON.stringify(result))
@@ -130,12 +132,15 @@ function doPost(e) {
 }
 
 /**
- * 3. '학교_기본정보' 전용 저장 함수 (google.script.run 및 doPost 호환)
- * A열: 입력시간 (타임스탬프)
- * B열: 학교코드 (자동 생성/매핑)
- * C열: 학생수
- * D열: 학교유형
- * E열: 교과편성표 드라이브 링크
+ * 3. '학교_기본정보' 전용 저장/업데이트 함수 (Upsert 지원)
+ * 컬럼 명세 (A~G열 7개 순서):
+ * A열 (Index 0): 입력시간 (YYYY-MM-DD HH:mm:ss)
+ * B열 (Index 1): 학교코드(고유값) (예: 2026테스트고)
+ * C열 (Index 2): 학년도 (예: 2026)
+ * D열 (Index 3): 학교명 (예: 테스트고등학교)
+ * E열 (Index 4): 고3 학생수 (⚠️ 텍스트 서식으로 저장)
+ * F열 (Index 5): 학교 유형 (예: 일반고, 자사고 등)
+ * G열 (Index 6): 교과 편성표(링크) (Google Drive URL)
  */
 function saveSchoolBasicInfo(data) {
   try {
@@ -145,63 +150,86 @@ function saveSchoolBasicInfo(data) {
       throw new Error("'학교_기본정보' 시트를 찾을 수 없습니다.");
     }
     
-    // A열: 타임스탬프 (YYYY-MM-DD HH:mm:ss)
+    // 1. 데이터 항목 정제
     var timestamp = data["입력 시간"] || data["입력시간"] || data["입력일시"] || Utilities.formatDate(new Date(), "Asia/Seoul", "yyyy-MM-dd HH:mm:ss");
-    
-    // 학교명 및 학년도 기반 학교 코드 자동 생성
-    var name = data["학교명"] || "";
+    var name = String(data["학교명"] || "").trim();
     var rawYear = data["학년도"] || data["연도"] || "2026";
-    var yearNum = String(rawYear).replace(/[^0-9]/g, "");
+    var year = String(rawYear).replace(/[^0-9]/g, "");
+    
     var prefix = name.length >= 4 ? name.substring(0, 4) : name;
+    var schoolCode = String(data["학교코드(고유값)"] || data["학교 코드(고유값)"] || data["학교코드"] || data["학교 코드"] || (year + prefix)).trim();
     
-    // B열: 학교 코드
-    var schoolCode = data["학교 코드"] || data["학교코드"] || data["학교 코드(고유값)"] || data["학교코드(고유값)"] || (yearNum + prefix);
-    
-    // C열: 학생 수
-    var students = data["학생 수"] || data["학생수"] || data["전교 학생수"] || data["전교학생수"] || data["studentCount"] || "";
-    
-    // D열: 학교 유형
-    var schoolType = data["학교 유형"] || data["학교유형"] || data["유형"] || "일반고";
-    
-    // E열: 교과 편성표 드라이브 링크
-    var link = data["교과 편성표"] || data["교과편성표"] || data["교과 편성표(링크)"] || data["드라이브링크"] || data["링크"] || "";
-
-    var lastCol = sheet.getLastColumn();
-    var newRow = [];
-
-    // 시트에 1행 헤더가 명시되어 있을 경우 헤더 위치에 정확히 대응
-    if (lastCol >= 5) {
-      var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-      var hasMatchedHeaders = false;
-      
-      for (var i = 0; i < headers.length; i++) {
-        var h = String(headers[i]).trim();
-        if (h.indexOf("입력") !== -1 || h.indexOf("시간") !== -1) { newRow.push(timestamp); hasMatchedHeaders = true; }
-        else if (h.indexOf("코드") !== -1) { newRow.push(schoolCode); hasMatchedHeaders = true; }
-        else if (h.indexOf("학생") !== -1) { newRow.push(students); hasMatchedHeaders = true; }
-        else if (h.indexOf("유형") !== -1) { newRow.push(schoolType); hasMatchedHeaders = true; }
-        else if (h.indexOf("편성") !== -1 || h.indexOf("링크") !== -1 || h.indexOf("드라이브") !== -1) { newRow.push(link); hasMatchedHeaders = true; }
-        else if (h.indexOf("학년") !== -1 || h.indexOf("연도") !== -1) { newRow.push(yearNum); }
-        else if (h.indexOf("학교명") !== -1) { newRow.push(name); }
-        else { newRow.push(data[h] || ""); }
-      }
-
-      if (!hasMatchedHeaders) {
-        // 헤더 매핑 미일치 시 A~E열 표준 순서 기록
-        newRow = [timestamp, schoolCode, students, schoolType, link];
-      }
-    } else {
-      // 기본 A~E열 5개 컬럼 순서 고정 저장 (A:입력시간, B:학교코드, C:학생수, D:학교유형, E:드라이브링크)
-      newRow = [timestamp, schoolCode, students, schoolType, link];
+    // 고3 학생수: 명시적 문자열 타입 처리
+    var rawStudents = data["고3 학생수"] || data["고3학생수"] || data["학생 수"] || data["학생수"] || data["studentCount"] || "";
+    var studentsStr = String(rawStudents).replace(/[^0-9]/g, "");
+    if (!studentsStr && rawStudents !== undefined && rawStudents !== null) {
+      studentsStr = String(rawStudents).trim();
     }
+    // 시트 셀에 텍스트 서식으로 보장하기 위해 따옴표 접두사 적용
+    var formattedStudents = studentsStr ? "'" + studentsStr : "";
     
-    sheet.appendRow(newRow);
+    var schoolType = String(data["학교 유형"] || data["학교유형"] || data["고교 유형"] || data["유형"] || "일반고").trim();
+    var link = String(data["교과 편성표(링크)"] || data["교과편성표(링크)"] || data["교과편성표"] || data["드라이브링크"] || data["링크"] || "").trim();
 
-    return {
-      success: true,
-      message: "'" + name + "' 학교 기본 정보가 성공적으로 구글 시트(A~E열)에 저장되었습니다.",
-      data: newRow
-    };
+    // A~G열 7개 순서 패키지 생성
+    var targetRowValues = [
+      timestamp,          // A열: 입력시간
+      schoolCode,         // B열: 학교코드(고유값)
+      year,               // C열: 학년도
+      name,               // D열: 학교명
+      formattedStudents,  // E열: 고3 학생수 (텍스트)
+      schoolType,         // F열: 학교 유형
+      link                // G열: 교과 편성표(링크)
+    ];
+
+    // 2. 기존 시트에 동일한 [학교코드] 또는 [학년도 + 학교명] 행이 존재하는지 스캔 (Upsert 로직)
+    var lastRow = sheet.getLastRow();
+    var matchedRowIndex = -1;
+
+    if (lastRow >= 2) {
+      var existingData = sheet.getRange(2, 1, lastRow - 1, 7).getValues();
+      for (var r = 0; r < existingData.length; r++) {
+        var exCode = String(existingData[r][1] || "").trim(); // B열
+        var exYear = String(existingData[r][2] || "").replace(/[^0-9]/g, ""); // C열
+        var exName = String(existingData[r][3] || "").trim(); // D열
+
+        // 1순위: 학교코드 일치 또는 2순위: (학년도 + 학교명) 일치
+        if ((schoolCode && exCode === schoolCode) || (year && name && exYear === year && exName === name)) {
+          matchedRowIndex = r + 2; // 시트 1행 헤더 고려 (+2)
+          break;
+        }
+      }
+    }
+
+    // 3. 기존 데이터 있으면 업데이트(Update), 없으면 신규 추가(Insert)
+    if (matchedRowIndex > 0) {
+      // E열 텍스트 서식 지정 후 값 설정
+      var cellRange = sheet.getRange(matchedRowIndex, 1, 1, 7);
+      sheet.getRange(matchedRowIndex, 5).setNumberFormat("@"); // E열 텍스트 서식 강제
+      cellRange.setValues([targetRowValues]);
+      
+      return {
+        success: true,
+        message: "'" + name + "' (" + year + "학년도) 학교 기본 정보가 구글 시트(A~G열)에서 업데이트되었습니다.",
+        action: "update",
+        row: matchedRowIndex,
+        data: targetRowValues
+      };
+    } else {
+      // 신규 행 추가
+      sheet.appendRow(targetRowValues);
+      var newRowIndex = sheet.getLastRow();
+      sheet.getRange(newRowIndex, 5).setNumberFormat("@"); // E열 텍스트 서식 지정
+      
+      return {
+        success: true,
+        message: "'" + name + "' (" + year + "학년도) 학교 기본 정보가 구글 시트(A~G열)에 신규 저장되었습니다.",
+        action: "insert",
+        row: newRowIndex,
+        data: targetRowValues
+      };
+    }
+
   } catch (err) {
     return {
       success: false,

@@ -490,12 +490,14 @@ function aggregateSchoolInfo(schoolName, targetYear) {
   const rawYear = schoolInfo['학년도'] || schoolInfo['연도'] || targetYear;
   const yearDisplay = cleanYear(rawYear);
 
-  // 고교 유형 정밀 파싱 (E/F열 및 호환 키 다중 대응)
+  // 고교 유형 정밀 파싱 (F열 / D열 및 다양한 호환 키 대응)
   const schoolType = (schoolInfo['학교 유형'] || schoolInfo['학교유형'] || schoolInfo['고교 유형'] || schoolInfo['고교유형'] || schoolInfo['유형'] || '일반고').trim() || '일반고';
 
-  // 학생 수 정밀 파싱 (E/C열 및 호환 키 다중 대응, 숫자 정제)
-  const rawStudents = schoolInfo['학생 수'] || schoolInfo['학생수'] || schoolInfo['전체 학생수'] || schoolInfo['전체학생수'] || schoolInfo['전교 학생수'] || schoolInfo['전교학생수'] || schoolInfo['studentCount'] || '';
-  let students = String(rawStudents || '').replace(/[^0-9]/g, '');
+  // 고3 학생 수 정밀 파싱 (E열 / C열 및 '고3 학생수' 호환 키 대응, 순수 숫자 정제)
+  const rawStudents = schoolInfo['고3 학생수'] || schoolInfo['고3학생수'] || schoolInfo['학생 수'] || schoolInfo['학생수'] || schoolInfo['전체 학생수'] || schoolInfo['전체학생수'] || schoolInfo['전교 학생수'] || schoolInfo['studentCount'] || '';
+  let studentsStr = String(rawStudents !== undefined && rawStudents !== null ? rawStudents : '').trim();
+  if (studentsStr.endsWith('.0')) studentsStr = studentsStr.substring(0, studentsStr.length - 2);
+  let students = studentsStr.replace(/[^0-9]/g, '');
   if (!students) {
     students = '미등록';
   }
@@ -512,7 +514,7 @@ function aggregateSchoolInfo(schoolName, targetYear) {
   const progList = state.programs.filter(p => {
     const nameMatch = (p['학교명'] || '').trim() === schoolName;
     const pYear = cleanYear(p['학년도'] || p['연도']);
-    const yearMatch = targetYear === 'ALL' || pYear === cleanTargetYear;
+    const yearMatch = targetYear === 'ALL' || sYear === cleanTargetYear;
     return nameMatch && yearMatch;
   });
 
@@ -524,7 +526,7 @@ function aggregateSchoolInfo(schoolName, targetYear) {
     year: yearDisplay,
     schoolType: schoolType,
     students: students,
-    link: schoolInfo['교과 편성표(링크)'] || schoolInfo['교과편성표'] || schoolInfo['드라이브링크'] || schoolInfo['링크'] || '',
+    link: schoolInfo['교과 편성표(링크)'] || schoolInfo['교과편성표(링크)'] || schoolInfo['교과편성표'] || schoolInfo['드라이브링크'] || schoolInfo['링크'] || '',
     sushiList: sushiList,
     progList: progList,
     collectionScore: collectionScore
@@ -993,7 +995,7 @@ async function handleProgramSubmit(event) {
 }
 
 /**
- * 3) 학교 기본 정보 제출 ('학교_기본정보' 시트 A~E열 매핑)
+ * 3) 학교 기본 정보 제출 ('학교_기본정보' 시트 A~G열 7개 컬럼 매핑 & Upsert 지원)
  */
 async function handleSchoolSubmit(event) {
   event.preventDefault();
@@ -1016,7 +1018,7 @@ async function handleSchoolSubmit(event) {
     return;
   }
 
-  // 학교 코드 자동 생성 (예: 2026 + 야탑고 -> 2026야탑고)
+  // 학교 코드 자동 생성 (예: 2026 + 테스트고 -> 2026테스트고)
   const prefix = name.length >= 4 ? name.substring(0, 4) : name;
   const cleanYearNum = year.replace(/[^0-9]/g, '');
   const schoolCode = `${cleanYearNum}${prefix}`;
@@ -1029,19 +1031,23 @@ async function handleSchoolSubmit(event) {
   try {
     const payload = {
       '입력 시간': new Date().toISOString().replace('T', ' ').substring(0, 19),
-      '학교 코드': schoolCode,
+      '학교코드(고유값)': schoolCode,
       '학교 코드(고유값)': schoolCode,
-      '학년도': year,
-      '연도': year,
+      '학교코드': schoolCode,
+      '학교 코드': schoolCode,
+      '학년도': cleanYearNum,
+      '연도': cleanYearNum,
       '학교명': name,
+      '고3 학생수': students,
+      '고3학생수': students,
       '학생 수': students,
       '학생수': students,
-      '전교 학생수': students,
-      '전교학생수': students,
       'studentCount': students,
       '학교 유형': schoolType,
       '학교유형': schoolType,
+      '고교 유형': schoolType,
       '교과 편성표(링크)': link,
+      '교과편성표(링크)': link,
       '교과편성표': link,
       '드라이브링크': link,
       '링크': link
@@ -1055,7 +1061,7 @@ async function handleSchoolSubmit(event) {
 
     const result = await res.json();
     if (result.success) {
-      showToast(`'${name}' 학교 기본 정보(A~E열)가 구글 시트에 성공적으로 저장되었습니다!`, 'success');
+      showToast(`'${name}' (${cleanYearNum}학년도) 학교 기본 정보(A~G열)가 구글 시트에 정상 저장/업데이트되었습니다!`, 'success');
       if (studentsInput) studentsInput.value = '';
       if (linkInput) linkInput.value = '';
       await loadData();

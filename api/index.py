@@ -450,36 +450,46 @@ class handler(http.server.BaseHTTPRequestHandler):
             return
 
         # -------------------------------------------------------------------
-        # 2. [학교 기본 정보 등록] (/api/schools)
+        # 2. [학교 기본 정보 등록 및 Upsert] (/api/schools)
         # -------------------------------------------------------------------
         if route == "schools":
             timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            year = str(body.get("학년도", body.get("연도", "2026학년도"))).strip()
+            raw_year = str(body.get("학년도", body.get("연도", "2026"))).strip()
+            clean_year_num = re.sub(r"[^0-9]", "", raw_year) or "2026"
             name = str(body.get("학교명", "")).strip()
-            students = str(body.get("학생 수", body.get("학생수", body.get("전교 학생수", body.get("전교학생수", body.get("studentCount", "")))))).strip()
-            school_type = str(body.get("학교 유형", body.get("학교유형", "일반고"))).strip()
-            link = str(body.get("교과 편성표(링크)", body.get("교과편성표", body.get("드라이브링크", body.get("링크", ""))))).strip()
+            
+            # 고3 학생수 추출 및 문자열 정제
+            raw_students = body.get("고3 학생수", body.get("고3학생수", body.get("학생 수", body.get("학생수", body.get("studentCount", "")))))
+            students = str(raw_students or "").strip()
+            if students.endswith(".0"):
+                students = students[:-2]
+
+            school_type = str(body.get("학교 유형", body.get("학교유형", body.get("고교 유형", "일반고")))).strip()
+            link = str(body.get("교과 편성표(링크)", body.get("교과편성표(링크)", body.get("교과편성표", body.get("드라이브링크", body.get("링크", "")))))).strip()
 
             if not name:
                 self.send_json(400, {"success": False, "error": "학교명을 입력해 주세요."})
                 return
 
             prefix = name[:4] if len(name) >= 4 else name
-            clean_year_num = re.sub(r"[^0-9]", "", year)
-            school_code = str(body.get("학교 코드", body.get("학교코드", f"{clean_year_num}{prefix}"))).strip()
+            school_code = str(body.get("학교코드(고유값)", body.get("학교 코드(고유값)", body.get("학교코드", body.get("학교 코드", f"{clean_year_num}{prefix}"))))).strip()
 
             new_record = {
                 "입력 시간": timestamp,
-                "학교 코드": school_code,
+                "학교코드(고유값)": school_code,
                 "학교 코드(고유값)": school_code,
-                "학년도": year,
+                "학교코드": school_code,
+                "학년도": clean_year_num,
+                "연도": clean_year_num,
                 "학교명": name,
+                "고3 학생수": students,
+                "고3학생수": students,
                 "학생 수": students,
                 "학생수": students,
                 "학교 유형": school_type,
                 "학교유형": school_type,
-                "교과 편성표": link,
                 "교과 편성표(링크)": link,
+                "교과편성표(링크)": link,
                 "드라이브링크": link,
                 "링크": link
             }
@@ -487,7 +497,7 @@ class handler(http.server.BaseHTTPRequestHandler):
             gas_res = sync_to_apps_script("add", "schools", new_record)
             self.send_json(200, {
                 "success": True,
-                "message": f"'{name}' 학교 기본 정보가 '학교_기본정보' 시트(A~E열)에 성공적으로 등록되었습니다.",
+                "message": f"'{name}' ({clean_year_num}학년도) 학교 기본 정보가 '학교_기본정보' 시트(A~G열)에 저장/업데이트되었습니다.",
                 "item": new_record,
                 "gas_res": gas_res
             })
