@@ -1,7 +1,7 @@
 /**
  * ===========================================================================
  * 인근 고등학교 수시 합격 데이터베이스 (상담용) - Google Apps Script 백엔드 웹앱
- * 파일: Code.gs (v26 - '학교_기본정보' 7개 컬럼 A~G열 1:1 매핑 및 Upsert 지원)
+ * 파일: Code.gs (v27 - 대시보드 방어적 데이터 반환 및 7개 컬럼 A~G열 Upsert 보장)
  * ===========================================================================
  * [구글 시트 탭별 표준 구조 및 컬럼 배치]
  * 1. '학교_기본정보' (A~G열 7개 컬럼 명세):
@@ -9,7 +9,7 @@
  *    - B열 (Index 1): 학교코드(고유값) (예: 2026테스트고)
  *    - C열 (Index 2): 학년도 (예: 2026)
  *    - D열 (Index 3): 학교명 (예: 테스트고등학교)
- *    - E열 (Index 4): 고3 학생수 (⚠️ 문자열/텍스트 서식으로 저장)
+ *    - E열 (Index 4): 고3 학생수 (⚠️ 텍스트 서식으로 저장)
  *    - F열 (Index 5): 학교 유형 (예: 일반고, 자사고, 특목고 등)
  *    - G열 (Index 6): 교과 편성표(링크) (Google Drive URL)
  *
@@ -21,26 +21,26 @@
  * ===========================================================================
  */
 
-// 1. HTTP GET 요청 처리 (웹앱 전체 시트 데이터 조회)
+// 1. HTTP GET 요청 처리 (웹앱 전체 시트 데이터 안전 조회)
 function doGet(e) {
   var response = { success: true, schools: [], sushi: [], programs: [] };
   
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     
-    // (1) '학교_기본정보' 시트 데이터 읽기
+    // (1) '학교_기본정보' 시트 데이터 안전 읽기
     var schoolSheet = getSheetByName(ss, ["학교_기본정보", "학교_기본 정보", "학교기본정보", "학교"]);
     if (schoolSheet) {
       response.schools = getSheetDataAsObjects(schoolSheet);
     }
     
-    // (2) '수시합격_입력' 시트 데이터 읽기
+    // (2) '수시합격_입력' 시트 데이터 안전 읽기
     var sushiSheet = getSheetByName(ss, ["수시합격_입력", "수시합격", "수시"]);
     if (sushiSheet) {
       response.sushi = getSheetDataAsObjects(sushiSheet);
     }
     
-    // (3) '특별프로그램_입력' 시트 데이터 읽기
+    // (3) '특별프로그램_입력' 시트 데이터 안전 읽기
     var programSheet = getSheetByName(ss, ["특별프로그램_입력", "특별프로그램", "프로그램"]);
     if (programSheet) {
       response.programs = getSheetDataAsObjects(programSheet);
@@ -165,7 +165,6 @@ function saveSchoolBasicInfo(data) {
     if (!studentsStr && rawStudents !== undefined && rawStudents !== null) {
       studentsStr = String(rawStudents).trim();
     }
-    // 시트 셀에 텍스트 서식으로 보장하기 위해 따옴표 접두사 적용
     var formattedStudents = studentsStr ? "'" + studentsStr : "";
     
     var schoolType = String(data["학교 유형"] || data["학교유형"] || data["고교 유형"] || data["유형"] || "일반고").trim();
@@ -177,12 +176,12 @@ function saveSchoolBasicInfo(data) {
       schoolCode,         // B열: 학교코드(고유값)
       year,               // C열: 학년도
       name,               // D열: 학교명
-      formattedStudents,  // E열: 고3 학생수 (텍스트)
+      formattedStudents,  // E열: 고3 학생수 (텍스트 서식)
       schoolType,         // F열: 학교 유형
       link                // G열: 교과 편성표(링크)
     ];
 
-    // 2. 기존 시트에 동일한 [학교코드] 또는 [학년도 + 학교명] 행이 존재하는지 스캔 (Upsert 로직)
+    // 2. 기존 시트에 동일한 [학교코드] 또는 [학년도 + 학교명] 행이 존재하는지 스캔 (Upsert)
     var lastRow = sheet.getLastRow();
     var matchedRowIndex = -1;
 
@@ -193,7 +192,6 @@ function saveSchoolBasicInfo(data) {
         var exYear = String(existingData[r][2] || "").replace(/[^0-9]/g, ""); // C열
         var exName = String(existingData[r][3] || "").trim(); // D열
 
-        // 1순위: 학교코드 일치 또는 2순위: (학년도 + 학교명) 일치
         if ((schoolCode && exCode === schoolCode) || (year && name && exYear === year && exName === name)) {
           matchedRowIndex = r + 2; // 시트 1행 헤더 고려 (+2)
           break;
@@ -203,7 +201,6 @@ function saveSchoolBasicInfo(data) {
 
     // 3. 기존 데이터 있으면 업데이트(Update), 없으면 신규 추가(Insert)
     if (matchedRowIndex > 0) {
-      // E열 텍스트 서식 지정 후 값 설정
       var cellRange = sheet.getRange(matchedRowIndex, 1, 1, 7);
       sheet.getRange(matchedRowIndex, 5).setNumberFormat("@"); // E열 텍스트 서식 강제
       cellRange.setValues([targetRowValues]);
@@ -216,10 +213,9 @@ function saveSchoolBasicInfo(data) {
         data: targetRowValues
       };
     } else {
-      // 신규 행 추가
       sheet.appendRow(targetRowValues);
       var newRowIndex = sheet.getLastRow();
-      sheet.getRange(newRowIndex, 5).setNumberFormat("@"); // E열 텍스트 서식 지정
+      sheet.getRange(newRowIndex, 5).setNumberFormat("@"); // E열 텍스트 서식 강제
       
       return {
         success: true,
@@ -238,28 +234,43 @@ function saveSchoolBasicInfo(data) {
   }
 }
 
-// 헬퍼 1: 시트 데이터를 JSON 객체 배열로 반환
+// 헬퍼 1: 시트 데이터를 JSON 객체 배열로 안전하게 반환
 function getSheetDataAsObjects(sheet) {
-  var lastRow = sheet.getLastRow();
-  var lastCol = sheet.getLastColumn();
-  if (lastRow <= 1 || lastCol === 0) return [];
-  
-  var data = sheet.getRange(1, 1, lastRow, lastCol).getValues();
-  var headers = data[0];
-  var result = [];
-  
-  for (var r = 1; r < data.length; r++) {
-    var row = data[r];
-    var obj = {};
-    for (var c = 0; c < headers.length; c++) {
-      var headerName = String(headers[c]).trim();
-      if (headerName !== "") {
-        obj[headerName] = row[c];
+  try {
+    var lastRow = sheet.getLastRow();
+    var lastCol = sheet.getLastColumn();
+    if (lastRow <= 1 || lastCol === 0) return [];
+    
+    var data = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+    if (!data || data.length <= 1) return [];
+    
+    var headers = data[0];
+    var result = [];
+    
+    for (var r = 1; r < data.length; r++) {
+      var row = data[r];
+      if (!row || row.length === 0) continue;
+      
+      var obj = {};
+      var hasData = false;
+      for (var c = 0; c < headers.length; c++) {
+        var headerName = String(headers[c] || "").trim();
+        if (headerName !== "") {
+          var val = row[c];
+          obj[headerName] = (val !== null && val !== undefined) ? val : "";
+          if (val !== null && val !== undefined && String(val).trim() !== "") {
+            hasData = true;
+          }
+        }
+      }
+      if (hasData) {
+        result.push(obj);
       }
     }
-    result.push(obj);
+    return result;
+  } catch (e) {
+    return [];
   }
-  return result;
 }
 
 // 헬퍼 2: 여러 후보 이름 중 실제로 존재하는 시트 반환
