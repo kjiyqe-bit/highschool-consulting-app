@@ -548,21 +548,33 @@ function aggregateSchoolInfo(schoolName, targetYear) {
 function renderSchoolList() {
   const container = document.getElementById('school-card-grid');
   const countBadge = document.getElementById('school-count-badge');
-  const yearFilter = document.getElementById('filter-year') ? document.getElementById('filter-year').value : '2026';
-  const searchQuery = document.getElementById('search-school-name') ? document.getElementById('search-school-name').value.trim().toLowerCase() : '';
+  const yearFilterEl = document.getElementById('filter-year');
+  const rawYearFilter = yearFilterEl ? String(yearFilterEl.value || 'ALL').trim() : 'ALL';
+  const searchQueryEl = document.getElementById('search-school-name');
+  const searchQuery = searchQueryEl ? String(searchQueryEl.value || '').trim().toLowerCase() : '';
 
   if (!container) return;
 
   const entries = getAllDistinctSchoolEntries();
-  const cleanFilterYear = cleanYear(yearFilter);
+  
+  // 'ALL', '전체', 빈값일 때 학년도 필터 무조건 100% Pass!
+  const isAllYear = !rawYearFilter || rawYearFilter === 'ALL' || rawYearFilter === '전체' || rawYearFilter === '';
+  const cleanFilterYear = cleanYear(rawYearFilter);
 
   let filtered = entries.filter(entry => {
-    if (yearFilter !== 'ALL') {
+    // 1) 학년도 필터링 (String/Number 및 'ALL'/'전체' 비교 방어)
+    if (!isAllYear) {
       const entryYearNum = cleanYear(entry.year);
-      if (entryYearNum !== cleanFilterYear) return false;
+      if (cleanFilterYear && entryYearNum && cleanFilterYear !== entryYearNum) {
+        return false;
+      }
     }
-    if (searchQuery && !entry.name.toLowerCase().includes(searchQuery)) {
-      return false;
+    // 2) 학교명 검색어 필터링
+    if (searchQuery) {
+      const safeName = String(entry.name || '').toLowerCase();
+      if (!safeName.includes(searchQuery)) {
+        return false;
+      }
     }
     return true;
   });
