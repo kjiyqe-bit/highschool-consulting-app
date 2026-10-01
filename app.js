@@ -490,11 +490,11 @@ function aggregateSchoolInfo(schoolName, targetYear) {
   const rawYear = schoolInfo['학년도'] || schoolInfo['연도'] || targetYear;
   const yearDisplay = cleanYear(rawYear);
 
-  // 학교 유형 정밀 파싱
-  const schoolType = (schoolInfo['학교 유형'] || schoolInfo['학교유형'] || schoolInfo['유형'] || '일반고').trim() || '일반고';
+  // 고교 유형 정밀 파싱 (E/F열 및 호환 키 다중 대응)
+  const schoolType = (schoolInfo['학교 유형'] || schoolInfo['학교유형'] || schoolInfo['고교 유형'] || schoolInfo['고교유형'] || schoolInfo['유형'] || '일반고').trim() || '일반고';
 
-  // 학생 수 정밀 파싱 (숫자 추출)
-  const rawStudents = schoolInfo['학생 수'] || schoolInfo['학생수'] || schoolInfo['전교 학생수'] || schoolInfo['전교학생수'] || schoolInfo['studentCount'] || '';
+  // 학생 수 정밀 파싱 (E/C열 및 호환 키 다중 대응, 숫자 정제)
+  const rawStudents = schoolInfo['학생 수'] || schoolInfo['학생수'] || schoolInfo['전체 학생수'] || schoolInfo['전체학생수'] || schoolInfo['전교 학생수'] || schoolInfo['전교학생수'] || schoolInfo['studentCount'] || '';
   let students = String(rawStudents || '').replace(/[^0-9]/g, '');
   if (!students) {
     students = '미등록';
@@ -524,7 +524,7 @@ function aggregateSchoolInfo(schoolName, targetYear) {
     year: yearDisplay,
     schoolType: schoolType,
     students: students,
-    link: schoolInfo['교과 편성표(링크)'] || schoolInfo['링크'] || '',
+    link: schoolInfo['교과 편성표(링크)'] || schoolInfo['교과편성표'] || schoolInfo['드라이브링크'] || schoolInfo['링크'] || '',
     sushiList: sushiList,
     progList: progList,
     collectionScore: collectionScore
@@ -585,18 +585,25 @@ function renderSchoolList() {
     return `
       <div onclick="openSchoolModal('${safeSchoolName}', '${safeYear}')" class="school-card bg-white rounded-3xl p-5 border border-black/5 apple-card-shadow cursor-pointer space-y-4 transition-all apple-button-touch">
         
-        <!-- 학교 헤더 & 유형 배지 -->
+        <!-- 학교 헤더 & 학년도 태그 -->
         <div class="flex items-start justify-between gap-2">
           <div class="flex items-center gap-3">
             <div class="w-12 h-12 rounded-2xl bg-[#007AFF] text-white font-extrabold text-lg flex items-center justify-center shadow-md shadow-blue-500/20 flex-shrink-0">
               ${initial}
             </div>
             <div>
-              <div class="flex items-center gap-1.5">
-                <h3 class="font-extrabold text-[#1D1D1F] text-base leading-tight">${entry.name}</h3>
-                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-blue-50 text-[#007AFF] border border-blue-200/60">${data.schoolType}</span>
+              <h3 class="font-extrabold text-[#1D1D1F] text-base leading-tight">${entry.name}</h3>
+              <!-- 전체 학생수 & 고교 유형 나란히 배지/라벨 배치 -->
+              <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                <span class="text-[11px] text-[#86868B] font-medium flex items-center gap-1 bg-[#F5F5F7] px-2.5 py-1 rounded-xl border border-black/5">
+                  <i data-lucide="users" class="w-3 h-3 text-[#007AFF]"></i>
+                  <span>전체 학생수: <b class="text-[#1D1D1F]">${data.students}${data.students !== '미등록' ? '명' : ''}</b></span>
+                </span>
+                <span class="text-[11px] font-bold text-[#007AFF] bg-blue-50 px-2.5 py-1 rounded-xl border border-blue-200/60 flex items-center gap-1">
+                  <i data-lucide="building-2" class="w-3 h-3"></i>
+                  <span>유형: ${data.schoolType}</span>
+                </span>
               </div>
-              <p class="text-xs text-[#86868B] mt-1 font-medium">전교 학생수: <b class="text-[#1D1D1F]">${data.students}</b>명</p>
             </div>
           </div>
           <span class="text-[11px] px-2.5 py-1 rounded-full font-bold border flex-shrink-0 ${getYearBadgeColorClass(data.year)}">${cleanYear(data.year)}</span>
@@ -648,12 +655,26 @@ function openSchoolModal(schoolName, year) {
 
   const data = aggregateSchoolInfo(schoolName, year);
 
-  // 헤더 정보 세팅
+  // 헤더 정보 및 서브 라벨 세팅
   document.getElementById('modal-school-initial').textContent = schoolName.substring(0, 1);
   document.getElementById('modal-school-name').textContent = schoolName;
   document.getElementById('modal-school-year').textContent = cleanYear(data.year);
-  document.getElementById('modal-school-sub').textContent = `전교 학생수: ${data.students}명 | 여러 상담진의 입력 데이터 종합`;
-  document.getElementById('modal-school-students').textContent = `${data.students} 명`;
+  
+  const modalSub = document.getElementById('modal-school-sub');
+  if (modalSub) {
+    modalSub.textContent = `전체 학생수: ${data.students}${data.students !== '미등록' ? '명' : ''} | 고교 유형: ${data.schoolType}`;
+  }
+
+  // 1) 학교 기본 정보 (전체 학생 수 & 고교 유형 나란히 1:1 바인딩)
+  const modalStudents = document.getElementById('modal-school-students');
+  if (modalStudents) {
+    modalStudents.textContent = `${data.students}${data.students !== '미등록' ? ' 명' : ''}`;
+  }
+
+  const modalType = document.getElementById('modal-school-type');
+  if (modalType) {
+    modalType.textContent = data.schoolType;
+  }
 
   // 교과 편성표 링크 컨테이너
   const linkCont = document.getElementById('modal-curriculum-container');
@@ -666,11 +687,11 @@ function openSchoolModal(schoolName, year) {
         </a>
       `;
     } else {
-      linkCont.innerHTML = `<span class="text-xs text-slate-400 bg-slate-100 px-3 py-2 rounded-xl">교과 편성표 링크 미등록</span>`;
+      linkCont.innerHTML = `<span class="text-xs text-slate-400 bg-slate-100 px-3 py-2 rounded-xl font-medium">교과 편성표 링크 미등록</span>`;
     }
   }
 
-  // 1) 전교 등수별 수시 합격 실적 테이블 렌더링
+  // 2) 전교 등수별 수시 합격 실적 테이블 렌더링
   const sushiTbody = document.getElementById('modal-sushi-tbody');
   const sushiCount = document.getElementById('modal-sushi-count');
   if (sushiCount) sushiCount.textContent = `총 ${data.sushiList.length}건`;
@@ -701,34 +722,51 @@ function openSchoolModal(schoolName, year) {
     `).join('');
   }
 
-  // 2) 특별 프로그램 및 우수 동아리 카드 렌더링
+  // 3) 진행 특별 프로그램 및 우수 동아리 카드 렌더링 (Padding 16~24px 및 애플 스타일 디자인 적용)
   const progListEl = document.getElementById('modal-prog-list');
   const progCount = document.getElementById('modal-prog-count');
   if (progCount) progCount.textContent = `총 ${data.progList.length}건`;
 
   if (data.progList.length === 0) {
     progListEl.innerHTML = `
-      <div class="col-span-full py-8 text-center text-[#86868B] bg-white rounded-2xl border border-dashed border-black/10">
+      <div class="col-span-full py-10 text-center text-[#86868B] bg-white rounded-3xl border border-dashed border-black/10 font-medium">
         등록된 특별 프로그램 또는 동아리 정보가 없습니다.
       </div>
     `;
   } else {
     progListEl.innerHTML = data.progList.map(item => {
-      const title = item['프로그램 명칭'] || item['프로그램명'] || '활동명 없음';
+      const title = item['프로그램 명칭'] || item['프로그램명'] || item['동아리명'] || '활동명 없음';
       const content = item['프로그램 주요 내용'] || item['프로그램 내용'] || item['주요 내용'] || '등록된 상세 내용이 없습니다.';
       const author = item['입력자'] || '상담진';
-      const isClub = title.includes('[우수동아리]') || title.includes('동아리');
+      const isClub = title.includes('[우수동아리]') || title.includes('동아리') || (item['구분'] === '우수동아리');
 
       return `
-        <div class="p-4.5 rounded-2xl border ${isClub ? 'bg-indigo-50/60 border-indigo-100' : 'bg-blue-50/60 border-blue-100'} space-y-2.5 apple-card-shadow">
-          <div class="flex items-center justify-between">
-            <span class="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${isClub ? 'bg-indigo-100 text-[#5856D6]' : 'bg-blue-100 text-[#007AFF]'}">
-              ${isClub ? '우수 동아리' : '특별 프로그램'}
+        <div class="p-5 sm:p-6 rounded-3xl bg-white border border-black/5 apple-card-shadow space-y-4 hover:border-black/10 transition-all">
+          
+          <!-- 카드 상단 헤더: 구해보는 태그 & 작성자 -->
+          <div class="flex items-center justify-between pb-3 border-b border-black/5">
+            <span class="inline-flex items-center gap-1.5 text-xs font-extrabold px-3 py-1 rounded-full ${isClub ? 'bg-indigo-50 text-[#5856D6] border border-indigo-200/60' : 'bg-blue-50 text-[#007AFF] border border-blue-200/60'}">
+              <i data-lucide="${isClub ? 'users' : 'sparkles'}" class="w-3.5 h-3.5"></i>
+              <span>${isClub ? '우수 동아리' : '진행 특별 프로그램'}</span>
             </span>
-            <span class="text-[10px] text-[#86868B]">작성자: ${author}</span>
+            <span class="text-xs text-[#86868B] font-medium flex items-center gap-1">
+              <i data-lucide="user-check" class="w-3.5 h-3.5 text-[#007AFF]"></i>
+              <span>작성자: <b class="text-[#1D1D1F]">${author}</b></span>
+            </span>
           </div>
-          <h5 class="text-xs font-extrabold text-[#1D1D1F]">${title}</h5>
-          <p class="text-xs text-[#1D1D1F] leading-relaxed bg-white/90 p-3 rounded-xl border border-black/5 whitespace-pre-wrap">${content}</p>
+
+          <!-- 프로그램 / 동아리 제목 -->
+          <h5 class="text-sm sm:text-base font-extrabold text-[#1D1D1F] leading-snug tracking-tight">
+            ${title}
+          </h5>
+
+          <!-- 본문 설명 박스 (Padding 16~20px, 행간 leading-relaxed, 톤앤매너 래퍼 적용) -->
+          <div class="p-4 sm:p-5 rounded-2xl bg-[#F9F9FB] border border-black/5">
+            <p class="text-xs sm:text-sm text-[#1D1D1F] leading-relaxed font-normal whitespace-pre-wrap break-words">
+              ${content}
+            </p>
+          </div>
+
         </div>
       `;
     }).join('');

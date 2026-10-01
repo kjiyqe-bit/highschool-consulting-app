@@ -537,19 +537,33 @@
       <!-- 모달 스크롤 본문 -->
       <div class="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1 bg-[#F5F5F7]">
         
-        <!-- 1) 학교 기본 정보 & 교과 편성표 링크 -->
-        <div class="bg-white p-5 rounded-3xl border border-black/5 apple-card-shadow flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div class="flex items-center gap-4 w-full sm:w-auto">
-            <div class="p-3 bg-blue-50 text-[#007AFF] rounded-2xl">
-              <i data-lucide="users" class="w-6 h-6"></i>
+        <!-- 1) 학교 기본 정보 (전체 학생 수 & 고교 유형 나란히 바인딩 & 교과 편성표 링크) -->
+        <div class="bg-white p-5 sm:p-6 rounded-3xl border border-black/5 apple-card-shadow flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div class="flex items-center gap-3 sm:gap-4 w-full sm:w-auto flex-wrap sm:flex-nowrap">
+            <!-- 전체 학생 수 영역 -->
+            <div class="flex items-center gap-3 p-3.5 rounded-2xl bg-[#F5F5F7] border border-black/5 flex-1 sm:flex-initial">
+              <div class="p-2.5 bg-blue-50 text-[#007AFF] rounded-xl flex-shrink-0">
+                <i data-lucide="users" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <p class="text-[11px] text-[#86868B] font-medium">전체 학생 수</p>
+                <h4 id="modal-school-students" class="text-base font-extrabold text-[#1D1D1F]">- 명</h4>
+              </div>
             </div>
-            <div>
-              <p class="text-xs text-[#86868B] font-medium">전체 학생 수</p>
-              <h4 id="modal-school-students" class="text-lg font-extrabold text-[#1D1D1F]">- 명</h4>
+
+            <!-- 고교 유형 영역 -->
+            <div class="flex items-center gap-3 p-3.5 rounded-2xl bg-blue-50/80 border border-blue-100 flex-1 sm:flex-initial">
+              <div class="p-2.5 bg-white text-[#007AFF] rounded-xl shadow-xs flex-shrink-0">
+                <i data-lucide="building-2" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <p class="text-[11px] text-[#007AFF] font-bold">고교 유형</p>
+                <h4 id="modal-school-type" class="text-base font-extrabold text-[#007AFF]">일반고</h4>
+              </div>
             </div>
           </div>
 
-          <div id="modal-curriculum-container" class="w-full sm:w-auto text-right">
+          <div id="modal-curriculum-container" class="w-full sm:w-auto text-right flex-shrink-0">
             <!-- 교과 편성표 링크 버튼 동적 삽입 -->
           </div>
         </div>
