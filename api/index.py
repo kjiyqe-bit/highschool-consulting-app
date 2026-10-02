@@ -205,7 +205,7 @@ class handler(http.server.BaseHTTPRequestHandler):
             return clean_path
 
         full_path = self.path.lower()
-        for candidate in ["data", "login", "schools", "sushi", "programs", "config", "health", "access"]:
+        for candidate in ["data", "login", "schools", "sushi", "programs", "config", "health", "access", "save"]:
             if candidate in full_path:
                 return candidate
 
@@ -598,6 +598,123 @@ class handler(http.server.BaseHTTPRequestHandler):
             else:
                 self.send_json(400, {"success": False, "error": "유효한 웹 앱 URL을 입력해 주세요."})
             return
+
+        # -------------------------------------------------------------------
+        # 6. [범용 데이터 저장 엔드포인트] (/api/save)
+        # -------------------------------------------------------------------
+        if route == "save":
+            table = str(body.get("table", "")).strip()
+            row_data = body.get("data", {})
+
+            if table == "schools":
+                timestamp = str(row_data.get("입력 시간", "")).strip() or datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                raw_year = str(row_data.get("학년도", row_data.get("연도", "2026"))).strip()
+                clean_year_num = re.sub(r"[^0-9]", "", raw_year) or "2026"
+                name = str(row_data.get("학교명", "")).strip()
+
+                raw_students = row_data.get("고3 학생수", row_data.get("고3학생수", row_data.get("학생 수", row_data.get("학생수", row_data.get("studentCount", "")))))
+                students = str(raw_students or "").strip()
+                if students.endswith(".0"):
+                    students = students[:-2]
+
+                school_type = str(row_data.get("학교 유형", row_data.get("학교유형", row_data.get("고교 유형", "일반고")))).strip()
+                link = str(row_data.get("교과 편성표(링크)", row_data.get("교과편성표(링크)", row_data.get("교과편성표", row_data.get("드라이브링크", row_data.get("링크", "")))))).strip()
+
+                if not name:
+                    self.send_json(400, {"success": False, "error": "학교명을 입력해 주세요."})
+                    return
+
+                prefix = name[:4] if len(name) >= 4 else name
+                school_code = str(row_data.get("학교코드(고유값)", row_data.get("학교 코드(고유값)", row_data.get("학교코드", row_data.get("학교 코드", f"{clean_year_num}{prefix}"))))).strip()
+
+                new_record = {
+                    "입력 시간": timestamp,
+                    "학교코드(고유값)": school_code,
+                    "학교 코드(고유값)": school_code,
+                    "학교코드": school_code,
+                    "학년도": clean_year_num,
+                    "연도": clean_year_num,
+                    "학교명": name,
+                    "고3 학생수": students,
+                    "고3학생수": students,
+                    "학생 수": students,
+                    "학생수": students,
+                    "학교 유형": school_type,
+                    "학교유형": school_type,
+                    "교과 편성표(링크)": link,
+                    "교과편성표(링크)": link,
+                    "드라이브링크": link,
+                    "링크": link
+                }
+
+                gas_res = sync_to_apps_script("add", "schools", new_record)
+                self.send_json(200, {
+                    "success": True,
+                    "message": f"'{name}' ({clean_year_num}학년도) 학교 기본 정보가 '학교_기본정보' 시트(A~G열)에 저장/업데이트되었습니다.",
+                    "item": new_record,
+                    "gas_res": gas_res
+                })
+                return
+
+            elif table == "sushi":
+                timestamp = str(row_data.get("입력 시간", "")).strip() or datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                year = str(row_data.get("연도", row_data.get("학년도", "2026"))).strip()
+                school = str(row_data.get("학교명", "")).strip()
+                rank = str(row_data.get("전교 등수", row_data.get("전교등수", ""))).strip()
+                univ = str(row_data.get("합격 대학", row_data.get("합격대학", ""))).strip()
+                dept = str(row_data.get("합격 학과", row_data.get("합격학과", ""))).strip()
+                type_name = str(row_data.get("전형명", "")).strip()
+                grade = str(row_data.get("내신 등급", row_data.get("내신등급", ""))).strip()
+                author = str(row_data.get("입력자", "")).strip() or "상담진"
+
+                row_obj = {
+                    "입력 시간": timestamp,
+                    "연도": year,
+                    "학교명": school,
+                    "전교 등수": rank,
+                    "합격 대학": univ,
+                    "합격 학과": dept,
+                    "전형명": type_name,
+                    "내신 등급": grade,
+                    "입력자": author
+                }
+                gas_res = sync_to_apps_script("add", "sushi", row_obj)
+                self.send_json(200, {
+                    "success": True,
+                    "message": "수시 합격 데이터가 성공적으로 등록되었습니다.",
+                    "item": row_obj,
+                    "gas_res": gas_res
+                })
+                return
+
+            elif table == "programs":
+                timestamp = str(row_data.get("입력 시간", "")).strip() or datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                year = str(row_data.get("연도", row_data.get("학년도", "2026"))).strip()
+                school = str(row_data.get("학교명", "")).strip()
+                category = str(row_data.get("구분", "특별프로그램")).strip()
+                prog_name = str(row_data.get("프로그램 명칭", row_data.get("프로그램명", ""))).strip()
+                prog_content = str(row_data.get("프로그램 주요 내용", row_data.get("프로그램 내용", ""))).strip()
+                author = str(row_data.get("입력자", "")).strip() or "상담진"
+
+                full_title = f"[{category}] {prog_name}" if category and not prog_name.startswith("[") else prog_name
+
+                new_record = {
+                    "입력 시간": timestamp,
+                    "연도": year,
+                    "학교명": school,
+                    "프로그램 명칭": full_title,
+                    "프로그램 주요 내용": prog_content,
+                    "입력자": author
+                }
+
+                gas_res = sync_to_apps_script("add", "programs", new_record)
+                self.send_json(200, {
+                    "success": True,
+                    "message": f"'{prog_name}' 정보가 성공적으로 등록되었습니다.",
+                    "item": new_record,
+                    "gas_res": gas_res
+                })
+                return
 
         self.send_json(404, {
             "success": False,
