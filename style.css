@@ -47,6 +47,7 @@ body {
 /* iOS 세그먼트 컨트롤 탭 활성화 효과 */
 .segmented-btn {
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
 }
 
 .segmented-btn.active {
